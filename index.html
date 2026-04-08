@@ -3,427 +3,1242 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>나이브 베이즈 스팸 필터 실습</title>
+<title>나이브 베이즈 스팸 필터 — 레이블링부터 시작</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:#0d0d14;color:#e8e8f0;font-family:system-ui,sans-serif;font-size:14px}
-.wrap{max-width:900px;margin:0 auto;padding:20px 14px 60px}
+.wrap{max-width:980px;margin:0 auto;padding:20px 14px 60px}
 h2{font-size:18px;font-weight:700;margin-bottom:10px;color:#fff}
-.sub{color:#94a3b8;font-size:13px;margin-bottom:18px;line-height:1.6}
+.sub{color:#94a3b8;font-size:13px;margin-bottom:16px;line-height:1.65}
 .card{background:#16161f;border:1px solid #2a2a3e;border-radius:11px;padding:16px;margin-bottom:12px}
 .info{border-left:3px solid #3b82f6;background:#0f1520;padding:10px 14px;border-radius:0 8px 8px 0;font-size:13px;color:#94a3b8;line-height:1.7;margin-bottom:14px}
 .warn{border-left:3px solid #f97316;background:rgba(249,115,22,.07);padding:10px 14px;border-radius:0 8px 8px 0;font-size:13px;color:#fb923c;line-height:1.7;margin-bottom:14px}
 .step{display:none}.step.on{display:block}
 .nav-row{display:flex;gap:6px;margin-bottom:20px;flex-wrap:wrap}
-.nbtn{padding:8px 16px;border-radius:7px;border:none;font-size:12px;font-weight:700;cursor:pointer;background:#1e1e2e;color:#555}
+.nbtn{padding:8px 15px;border-radius:7px;border:none;font-size:12px;font-weight:700;cursor:pointer;background:#1e1e2e;color:#555}
 .nbtn.on{background:rgba(229,9,20,.15);color:#ff4d57;border:1px solid #ff4d57}
 .nbtn.done{color:#94a3b8}
-.nbtn.locked{opacity:.3;cursor:not-allowed}
 .btn{padding:9px 20px;border-radius:8px;border:none;font-size:13px;font-weight:700;cursor:pointer}
-.br{background:#e50914;color:#fff}
-.bb{background:#3b82f6;color:#fff}
+.br{background:#e50914;color:#fff}.bb{background:#3b82f6;color:#fff}
 .bg{background:#1e1e2e;color:#94a3b8;border:1px solid #3a3a55}
 .brow{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap}
-label{font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:#666;display:block;margin-bottom:4px}
+
+/* 이메일 카드 */
+.email-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+.ecard{border-radius:10px;padding:14px;border:1px solid #2a2a3e;background:#16161f;position:relative}
+.ecard-num{font-size:10px;color:#444;font-family:monospace;margin-bottom:6px}
+.ecard-subj{font-size:13px;font-weight:700;color:#fff;margin-bottom:7px}
+.ecard-body{font-size:12px;color:#94a3b8;line-height:1.75;margin-bottom:10px}
+.label-btns{display:flex;gap:6px}
+.lbtn{flex:1;padding:7px 4px;border-radius:7px;border:1px solid #3a3a55;background:transparent;font-size:12px;font-weight:700;cursor:pointer;color:#666;transition:all .15s;text-align:center}
+.lbtn:hover{border-color:#94a3b8;color:#fff}
+.lbtn.spam{background:rgba(239,68,68,.15);border-color:#ef4444;color:#ef4444}
+.lbtn.ham{background:rgba(34,197,94,.12);border-color:#22c55e;color:#22c55e}
+.lbtn.unk{background:rgba(234,179,8,.1);border-color:#eab308;color:#eab308}
+
+/* 의견 불일치 표시 */
+.conflict-dot{width:8px;height:8px;border-radius:50%;background:#eab308;display:inline-block;margin-right:5px}
+
+/* 멤버 탭 */
+.mtabs{display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap}
+.mtab{padding:6px 14px;border-radius:7px;border:1px solid #2a2a3e;background:transparent;font-size:13px;font-weight:700;color:#94a3b8;cursor:pointer}
+.mpanel{display:none}.mpanel.show{display:block}
+
+/* 단어 클라우드 */
+.wcloud{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+.wtoken{padding:8px 14px;border-radius:8px;border:1px solid #2a2a3e;background:#1e1e2e;cursor:pointer;font-size:14px;font-weight:600;color:#94a3b8;transition:all .15s;user-select:none;position:relative}
+.wtoken:hover{border-color:#555;color:#fff;transform:translateY(-1px)}
+.wtoken.sel-0{background:rgba(229,9,20,.15);border-color:#ff4d57;color:#ff4d57}
+.wtoken.sel-1{background:rgba(59,130,246,.15);border-color:#60a5fa;color:#60a5fa}
+.wtoken.sel-2{background:rgba(168,85,247,.15);border-color:#a855f7;color:#a855f7}
+.wchk{display:none;position:absolute;top:-5px;right:-5px;width:16px;height:16px;border-radius:50%;font-size:9px;font-weight:700;align-items:center;justify-content:center}
+.wtoken.sel-0 .wchk{display:flex;background:#ff4d57;color:#fff}
+.wtoken.sel-1 .wchk{display:flex;background:#60a5fa;color:#fff}
+.wtoken.sel-2 .wchk{display:flex;background:#a855f7;color:#fff}
+.sel-preview{display:flex;gap:6px;flex-wrap:wrap;min-height:34px;padding:8px 12px;background:#111;border-radius:8px;border:1px solid #2a2a3e;margin-bottom:10px}
+.sel-tag{padding:4px 10px;border-radius:6px;font-size:12px;font-weight:600}
+.empty-hint{font-size:12px;color:#333}
+
+/* 확률 바 */
+.bar{width:55px;height:4px;background:#2a2a3e;border-radius:2px;overflow:hidden;display:inline-block;vertical-align:middle;margin-right:5px}
+.bf{height:100%;border-radius:2px}
+.pv{font-family:monospace;font-size:12px}
+
+/* 테이블 */
 table{width:100%;border-collapse:collapse;font-size:13px}
 th{background:#1e1e2e;padding:8px 12px;text-align:left;font-size:10px;color:#475569;border-bottom:1px solid #2a2a3e;white-space:nowrap;letter-spacing:1px;text-transform:uppercase}
 td{padding:8px 12px;border-bottom:1px solid #1e1e2e;vertical-align:middle}
-.spam-row td{background:rgba(239,68,68,.04)}
-.ham-row td{background:rgba(34,197,94,.04)}
 .badge{display:inline-block;padding:2px 8px;border-radius:5px;font-size:11px;font-weight:700}
-.badge-spam{background:rgba(239,68,68,.15);color:#ef4444}
-.badge-ham{background:rgba(34,197,94,.12);color:#22c55e}
-.word-tag{display:inline-block;padding:2px 7px;border-radius:4px;font-size:11px;font-weight:600;margin:1px;background:#1e1e2e;border:1px solid #3a3a55;color:#94a3b8}
-.bar{width:60px;height:5px;background:#2a2a3e;border-radius:2px;overflow:hidden;display:inline-block;vertical-align:middle;margin-right:6px}
-.bf{height:100%;border-radius:2px}
-.prob-val{font-family:monospace;font-size:12px}
-.srow{display:flex;align-items:center;gap:7px;margin-bottom:7px}
-.strk{flex:1;height:6px;background:#2a2a3e;border-radius:3px;overflow:hidden}
-.sfil{height:100%;border-radius:3px;transition:width .5s}
-.spct{font-size:11px;color:#94a3b8;min-width:36px;text-align:right;font-family:monospace}
-.res-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px;margin:14px 0}
-.rcard{background:#16161f;border:1px solid #2a2a3e;border-radius:11px;padding:14px}
-.winner{margin-top:10px;padding:8px 12px;border-radius:7px;font-weight:700;text-align:center;font-size:14px}
-.prior-row{display:flex;gap:8px;margin-bottom:6px;align-items:center;flex-wrap:wrap}
-.prior-chip{padding:5px 12px;border-radius:7px;border:1px solid #3a3a55;background:transparent;cursor:pointer;font-size:13px;font-weight:600;color:#94a3b8}
-.prior-chip.sel{background:rgba(59,130,246,.15);border-color:#3b82f6;color:#60a5fa}
+.bs{background:rgba(239,68,68,.15);color:#ef4444}.bh{background:rgba(34,197,94,.12);color:#22c55e}
+.bunk{background:rgba(234,179,8,.12);color:#eab308}
+.wtag{display:inline-block;padding:2px 6px;border-radius:4px;font-size:11px;font-weight:600;margin:1px;background:#1e1e2e;border:1px solid #3a3a55;color:#94a3b8}
+
+/* 정확도 카드 */
+.acc-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:12px 0}
+.acc-card{text-align:center;padding:14px;border-radius:9px;border:1px solid #2a2a3e}
+
+/* 토론 질문 */
 .dq{padding:11px 13px;background:#1e1e2e;border-radius:8px;margin-bottom:7px;font-size:13px;line-height:1.6}
 .qn{font-size:10px;font-family:monospace;margin-bottom:4px}
-@media(max-width:560px){table{font-size:12px}}
+
+@media(max-width:640px){.email-grid{grid-template-columns:1fr}.acc-grid{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
 <div class="wrap">
-
 <div class="nav-row" id="nav"></div>
 
 <!-- 0: 소개 -->
 <div class="step on" id="s0">
   <div style="text-align:center;padding:28px 0 16px">
     <div style="display:inline-block;padding:3px 12px;border:1px solid #e50914;border-radius:20px;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:#ff4d57;margin-bottom:14px">AI 수업 실습</div>
-    <h1 style="font-size:30px;font-weight:900;margin-bottom:12px;line-height:1.3">나이브 베이즈로<br>스팸 필터 만들기</h1>
-    <p class="sub" style="max-width:480px;margin:0 auto 20px">학습 데이터로 단어별 확률을 계산하고, 새 이메일이 스팸인지 정상인지 직접 판정해 봅니다.<br>단일 증거(단어 1개)와 복합 증거(여러 단어)의 차이도 비교합니다.</p>
-    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;max-width:520px;margin:0 auto 20px">
-      <div class="card" style="text-align:center"><div style="font-size:20px;margin-bottom:5px">📚</div><div style="font-size:11px;font-weight:700;color:#60a5fa">학습 데이터</div><div style="font-size:11px;color:#94a3b8;margin-top:3px">이메일 10개</div></div>
-      <div class="card" style="text-align:center"><div style="font-size:20px;margin-bottom:5px">🧮</div><div style="font-size:11px;font-weight:700;color:#f97316">확률 계산</div><div style="font-size:11px;color:#94a3b8;margin-top:3px">단어 5개</div></div>
-      <div class="card" style="text-align:center"><div style="font-size:20px;margin-bottom:5px">🧪</div><div style="font-size:11px;font-weight:700;color:#a855f7">테스트</div><div style="font-size:11px;color:#94a3b8;margin-top:3px">이메일 6개</div></div>
-      <div class="card" style="text-align:center"><div style="font-size:20px;margin-bottom:5px">📊</div><div style="font-size:11px;font-weight:700;color:#22c55e">비교 분석</div><div style="font-size:11px;color:#94a3b8;margin-top:3px">단일 vs 복합</div></div>
+    <h1 style="font-size:30px;font-weight:900;margin-bottom:12px;line-height:1.3">이 이메일,<br>스팸인가요 정상인가요?</h1>
+    <p class="sub" style="max-width:540px;margin:0 auto 20px">
+      이메일을 읽고 <strong style="color:#fff">직접 레이블을 붙입니다.</strong><br>
+      팀원마다 판단이 다를 수 있습니다. 그 차이가 왜 생기는지,<br>
+      그리고 레이블이 달라지면 스팸 필터 성능이 어떻게 달라지는지 확인합니다.
+    </p>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;max-width:560px;margin:0 auto 20px">
+      <div class="card" style="text-align:center"><div style="font-size:20px;margin-bottom:4px">📧</div><div style="font-size:11px;font-weight:700;color:#60a5fa">이메일 읽기</div><div style="font-size:10px;color:#555;margin-top:2px">레이블 없음</div></div>
+      <div class="card" style="text-align:center"><div style="font-size:20px;margin-bottom:4px">🏷️</div><div style="font-size:11px;font-weight:700;color:#f97316">직접 레이블링</div><div style="font-size:10px;color:#555;margin-top:2px">팀원별 판단</div></div>
+      <div class="card" style="text-align:center"><div style="font-size:20px;margin-bottom:4px">🎯</div><div style="font-size:11px;font-weight:700;color:#a855f7">키워드 선택</div><div style="font-size:10px;color:#555;margin-top:2px">내 레이블 기준</div></div>
+      <div class="card" style="text-align:center"><div style="font-size:20px;margin-bottom:4px">📊</div><div style="font-size:11px;font-weight:700;color:#22c55e">성능 비교</div><div style="font-size:10px;color:#555;margin-top:2px">레이블 차이 분석</div></div>
     </div>
-    <button class="btn br" onclick="go(1)">시작하기 →</button>
+    <div class="warn" style="max-width:520px;margin:0 auto 18px;text-align:left">
+      <strong>핵심 질문</strong><br>
+      알고리즘보다 레이블링이 더 어렵습니다.<br>
+      실제 AI도 처음에는 <em>사람이 스팸/정상을 판단한 데이터</em>로 학습합니다.<br>
+      그 판단이 사람마다 다르다면, AI도 다르게 학습됩니다.
+    </div>
+    <button class="btn br" onclick="go(1)">이메일 읽기 시작 →</button>
   </div>
 </div>
 
-<!-- 1: 학습 데이터 -->
+<!-- 1: 레이블링 -->
 <div class="step" id="s1">
-  <h2>학습 데이터셋</h2>
-  <div class="sub">아래 이메일 10개(스팸 5개, 정상 5개)로 스팸 필터를 학습합니다. 어떤 단어가 스팸 신호인지 살펴보세요.</div>
-  <div class="card">
-    <div style="overflow-x:auto"><table>
-      <thead><tr><th>#</th><th>이메일 제목</th><th>분류</th><th>포함 단어</th></tr></thead>
-      <tbody><tr class="spam-row"><td style="color:#666;font-size:12px">1</td><td>★무료★ 상품권 10만원 즉시 지급! 지금 클릭!</td><td><span class="badge badge-spam">스팸</span></td><td><span class="word-tag">무료</span><span class="word-tag">클릭</span></td></tr>
-<tr class="spam-row"><td style="color:#666;font-size:12px">2</td><td>이벤트 당첨! 지금 바로 수령하세요</td><td><span class="badge badge-spam">스팸</span></td><td><span class="word-tag">이벤트</span></td></tr>
-<tr class="spam-row"><td style="color:#666;font-size:12px">3</td><td>대출 이자 0%! 지금 신청하면 무료!</td><td><span class="badge badge-spam">스팸</span></td><td><span class="word-tag">신청</span><span class="word-tag">무료</span></td></tr>
-<tr class="spam-row"><td style="color:#666;font-size:12px">4</td><td>클릭 한 번으로 100만원 당첨 기회!</td><td><span class="badge badge-spam">스팸</span></td><td><span class="word-tag">클릭</span></td></tr>
-<tr class="spam-row"><td style="color:#666;font-size:12px">5</td><td>이벤트 참여하고 아이폰 받아가세요!</td><td><span class="badge badge-spam">스팸</span></td><td><span class="word-tag">이벤트</span></td></tr>
-<tr class="ham-row"><td style="color:#666;font-size:12px">6</td><td>[공지] 내일 수학 수행평가 범위 안내</td><td><span class="badge badge-ham">정상</span></td><td><span class="word-tag">안내</span></td></tr>
-<tr class="ham-row"><td style="color:#666;font-size:12px">7</td><td>Re: 모둠 발표 자료 공유합니다</td><td><span class="badge badge-ham">정상</span></td><td><span style="color:#444;font-size:11px">—</span></td></tr>
-<tr class="ham-row"><td style="color:#666;font-size:12px">8</td><td>[안내] 도서관 반납 기한 연장 신청</td><td><span class="badge badge-ham">정상</span></td><td><span class="word-tag">안내</span><span class="word-tag">신청</span></td></tr>
-<tr class="ham-row"><td style="color:#666;font-size:12px">9</td><td>이번 주 급식 메뉴 변경 안내</td><td><span class="badge badge-ham">정상</span></td><td><span class="word-tag">안내</span></td></tr>
-<tr class="ham-row"><td style="color:#666;font-size:12px">10</td><td>방과후 프로그램 신청 마감 안내</td><td><span class="badge badge-ham">정상</span></td><td><span class="word-tag">신청</span><span class="word-tag">안내</span></td></tr>
-      </tbody>
-    </table></div>
+  <h2>이메일 직접 분류하기</h2>
+  <div class="sub">
+    아래 10개 이메일에 <strong style="color:#fff">스팸 / 정상 / 모르겠음</strong> 중 하나를 선택하세요.<br>
+    탭을 전환해 팀원별로 각자 판단합니다. 서로 상의하지 말고 독립적으로 판단하세요!
   </div>
-  <div class="info">학습 단어 5개: <strong style="color:#60a5fa">무료 / 이벤트 / 신청 / 클릭 / 안내</strong> &nbsp;|&nbsp; 스팸 5개, 정상 5개, V=5</div>
+  <div class="mtabs">
+    <button class="mtab" id="lt0" onclick="showLabelMember(0)" style="background:rgba(229,9,20,.12);border-color:#ff4d57;color:#ff4d57">팀원1</button>
+    <button class="mtab" id="lt1" onclick="showLabelMember(1)">팀원2</button>
+    <button class="mtab" id="lt2" onclick="showLabelMember(2)">팀원3</button>
+  </div>
+  <div class="mpanel show" id="lp0">
+    <div class="info">팀원1 (데이터 수집가) — 각 이메일이 스팸인지 정상인지 판단하세요.</div>
+    <div class="email-grid">
+    <div class="ecard" id="ec0_E01">
+      <div class="ecard-num">E01</div>
+      <div class="ecard-subj">📧 특별 할인! 지금 신청하면 경품 증정</div>
+      <div class="ecard-body">안녕하세요! 이번 주말까지만 진행되는 특별 행사입니다. 지금 신청하시면 경품을 드립니다. 서두르세요!</div>
+      <div class="label-btns">
+        <button class="lbtn" id="lb0_E01_spam" onclick="setLabel(0,'E01','스팸')">📛 스팸</button>
+        <button class="lbtn" id="lb0_E01_ham"  onclick="setLabel(0,'E01','정상')">✅ 정상</button>
+        <button class="lbtn" id="lb0_E01_unk"  onclick="setLabel(0,'E01','모름')">❓ 모르겠음</button>
+      </div>
+    </div>
+    <div class="ecard" id="ec0_E02">
+      <div class="ecard-num">E02</div>
+      <div class="ecard-subj">📧 방과후 무료 강좌 신청 안내</div>
+      <div class="ecard-body">이번 학기 방과후 무료 특별 강좌 신청을 받습니다. 관심 있는 학생은 금요일까지 신청해 주세요.</div>
+      <div class="label-btns">
+        <button class="lbtn" id="lb0_E02_spam" onclick="setLabel(0,'E02','스팸')">📛 스팸</button>
+        <button class="lbtn" id="lb0_E02_ham"  onclick="setLabel(0,'E02','정상')">✅ 정상</button>
+        <button class="lbtn" id="lb0_E02_unk"  onclick="setLabel(0,'E02','모름')">❓ 모르겠음</button>
+      </div>
+    </div>
+    <div class="ecard" id="ec0_E03">
+      <div class="ecard-num">E03</div>
+      <div class="ecard-subj">📧 이벤트 당첨! 지금 클릭하세요</div>
+      <div class="ecard-body">고객님께서 이벤트 경품 당첨자로 선정되셨습니다. 당첨 확인을 위해 지금 클릭하여 정보를 입력해 주세요.</div>
+      <div class="label-btns">
+        <button class="lbtn" id="lb0_E03_spam" onclick="setLabel(0,'E03','스팸')">📛 스팸</button>
+        <button class="lbtn" id="lb0_E03_ham"  onclick="setLabel(0,'E03','정상')">✅ 정상</button>
+        <button class="lbtn" id="lb0_E03_unk"  onclick="setLabel(0,'E03','모름')">❓ 모르겠음</button>
+      </div>
+    </div>
+    <div class="ecard" id="ec0_E04">
+      <div class="ecard-num">E04</div>
+      <div class="ecard-subj">📧 수학여행 비용 납부 안내</div>
+      <div class="ecard-body">수학여행 비용 납부 기한이 다가왔습니다. 이번 주 금요일까지 납부해 주시기 바랍니다.</div>
+      <div class="label-btns">
+        <button class="lbtn" id="lb0_E04_spam" onclick="setLabel(0,'E04','스팸')">📛 스팸</button>
+        <button class="lbtn" id="lb0_E04_ham"  onclick="setLabel(0,'E04','정상')">✅ 정상</button>
+        <button class="lbtn" id="lb0_E04_unk"  onclick="setLabel(0,'E04','모름')">❓ 모르겠음</button>
+      </div>
+    </div>
+    <div class="ecard" id="ec0_E05">
+      <div class="ecard-num">E05</div>
+      <div class="ecard-subj">📧 오늘만 무료! 지금 바로 신청</div>
+      <div class="ecard-body">오늘 하루만 무료로 제공되는 서비스입니다. 지금 바로 신청하시면 할인 혜택도 함께 드립니다.</div>
+      <div class="label-btns">
+        <button class="lbtn" id="lb0_E05_spam" onclick="setLabel(0,'E05','스팸')">📛 스팸</button>
+        <button class="lbtn" id="lb0_E05_ham"  onclick="setLabel(0,'E05','정상')">✅ 정상</button>
+        <button class="lbtn" id="lb0_E05_unk"  onclick="setLabel(0,'E05','모름')">❓ 모르겠음</button>
+      </div>
+    </div>
+    <div class="ecard" id="ec0_E06">
+      <div class="ecard-num">E06</div>
+      <div class="ecard-subj">📧 학교 이벤트 행사 일정 공지</div>
+      <div class="ecard-body">이번 달 학교 이벤트 및 행사 일정을 안내합니다. 체육대회는 다음 주 화요일 진행 예정입니다.</div>
+      <div class="label-btns">
+        <button class="lbtn" id="lb0_E06_spam" onclick="setLabel(0,'E06','스팸')">📛 스팸</button>
+        <button class="lbtn" id="lb0_E06_ham"  onclick="setLabel(0,'E06','정상')">✅ 정상</button>
+        <button class="lbtn" id="lb0_E06_unk"  onclick="setLabel(0,'E06','모름')">❓ 모르겠음</button>
+      </div>
+    </div>
+    <div class="ecard" id="ec0_E07">
+      <div class="ecard-num">E07</div>
+      <div class="ecard-subj">📧 100만원 경품 당첨 확인</div>
+      <div class="ecard-body">축하합니다! 귀하가 경품 행사 당첨자로 선정되셨습니다. 지금 클릭하여 당첨 확인을 해주세요.</div>
+      <div class="label-btns">
+        <button class="lbtn" id="lb0_E07_spam" onclick="setLabel(0,'E07','스팸')">📛 스팸</button>
+        <button class="lbtn" id="lb0_E07_ham"  onclick="setLabel(0,'E07','정상')">✅ 정상</button>
+        <button class="lbtn" id="lb0_E07_unk"  onclick="setLabel(0,'E07','모름')">❓ 모르겠음</button>
+      </div>
+    </div>
+    <div class="ecard" id="ec0_E08">
+      <div class="ecard-num">E08</div>
+      <div class="ecard-subj">📧 동아리 신청 마감 안내</div>
+      <div class="ecard-body">2학기 동아리 신청이 이번 주 금요일 마감됩니다. 신청서를 담임 선생님께 제출해 주세요.</div>
+      <div class="label-btns">
+        <button class="lbtn" id="lb0_E08_spam" onclick="setLabel(0,'E08','스팸')">📛 스팸</button>
+        <button class="lbtn" id="lb0_E08_ham"  onclick="setLabel(0,'E08','정상')">✅ 정상</button>
+        <button class="lbtn" id="lb0_E08_unk"  onclick="setLabel(0,'E08','모름')">❓ 모르겠음</button>
+      </div>
+    </div>
+    <div class="ecard" id="ec0_E09">
+      <div class="ecard-num">E09</div>
+      <div class="ecard-subj">📧 무료 상담 신청하고 혜택 받기</div>
+      <div class="ecard-body">지금 무료 상담을 신청하시면 특별 할인 혜택을 드립니다. 오늘만 가능한 이벤트이니 서두르세요!</div>
+      <div class="label-btns">
+        <button class="lbtn" id="lb0_E09_spam" onclick="setLabel(0,'E09','스팸')">📛 스팸</button>
+        <button class="lbtn" id="lb0_E09_ham"  onclick="setLabel(0,'E09','정상')">✅ 정상</button>
+        <button class="lbtn" id="lb0_E09_unk"  onclick="setLabel(0,'E09','모름')">❓ 모르겠음</button>
+      </div>
+    </div>
+    <div class="ecard" id="ec0_E10">
+      <div class="ecard-num">E10</div>
+      <div class="ecard-subj">📧 급식 메뉴 특별 변경 안내</div>
+      <div class="ecard-body">이번 주 목요일 급식 메뉴가 특별 메뉴로 변경됩니다. 자세한 내용은 학교 홈페이지를 확인해 주세요.</div>
+      <div class="label-btns">
+        <button class="lbtn" id="lb0_E10_spam" onclick="setLabel(0,'E10','스팸')">📛 스팸</button>
+        <button class="lbtn" id="lb0_E10_ham"  onclick="setLabel(0,'E10','정상')">✅ 정상</button>
+        <button class="lbtn" id="lb0_E10_unk"  onclick="setLabel(0,'E10','모름')">❓ 모르겠음</button>
+      </div>
+    </div>
+    </div>
+    <div style="font-size:12px;color:#475569;margin-bottom:4px">분류 완료: <span id="lcnt0" style="color:#ff4d57">0</span>/10</div>
+  </div>
+  <div class="mpanel " id="lp1">
+    <div class="info">팀원2 (확률 계산가) — 각 이메일이 스팸인지 정상인지 판단하세요.</div>
+    <div class="email-grid">
+    <div class="ecard" id="ec1_E01">
+      <div class="ecard-num">E01</div>
+      <div class="ecard-subj">📧 특별 할인! 지금 신청하면 경품 증정</div>
+      <div class="ecard-body">안녕하세요! 이번 주말까지만 진행되는 특별 행사입니다. 지금 신청하시면 경품을 드립니다. 서두르세요!</div>
+      <div class="label-btns">
+        <button class="lbtn" id="lb1_E01_spam" onclick="setLabel(1,'E01','스팸')">📛 스팸</button>
+        <button class="lbtn" id="lb1_E01_ham"  onclick="setLabel(1,'E01','정상')">✅ 정상</button>
+        <button class="lbtn" id="lb1_E01_unk"  onclick="setLabel(1,'E01','모름')">❓ 모르겠음</button>
+      </div>
+    </div>
+    <div class="ecard" id="ec1_E02">
+      <div class="ecard-num">E02</div>
+      <div class="ecard-subj">📧 방과후 무료 강좌 신청 안내</div>
+      <div class="ecard-body">이번 학기 방과후 무료 특별 강좌 신청을 받습니다. 관심 있는 학생은 금요일까지 신청해 주세요.</div>
+      <div class="label-btns">
+        <button class="lbtn" id="lb1_E02_spam" onclick="setLabel(1,'E02','스팸')">📛 스팸</button>
+        <button class="lbtn" id="lb1_E02_ham"  onclick="setLabel(1,'E02','정상')">✅ 정상</button>
+        <button class="lbtn" id="lb1_E02_unk"  onclick="setLabel(1,'E02','모름')">❓ 모르겠음</button>
+      </div>
+    </div>
+    <div class="ecard" id="ec1_E03">
+      <div class="ecard-num">E03</div>
+      <div class="ecard-subj">📧 이벤트 당첨! 지금 클릭하세요</div>
+      <div class="ecard-body">고객님께서 이벤트 경품 당첨자로 선정되셨습니다. 당첨 확인을 위해 지금 클릭하여 정보를 입력해 주세요.</div>
+      <div class="label-btns">
+        <button class="lbtn" id="lb1_E03_spam" onclick="setLabel(1,'E03','스팸')">📛 스팸</button>
+        <button class="lbtn" id="lb1_E03_ham"  onclick="setLabel(1,'E03','정상')">✅ 정상</button>
+        <button class="lbtn" id="lb1_E03_unk"  onclick="setLabel(1,'E03','모름')">❓ 모르겠음</button>
+      </div>
+    </div>
+    <div class="ecard" id="ec1_E04">
+      <div class="ecard-num">E04</div>
+      <div class="ecard-subj">📧 수학여행 비용 납부 안내</div>
+      <div class="ecard-body">수학여행 비용 납부 기한이 다가왔습니다. 이번 주 금요일까지 납부해 주시기 바랍니다.</div>
+      <div class="label-btns">
+        <button class="lbtn" id="lb1_E04_spam" onclick="setLabel(1,'E04','스팸')">📛 스팸</button>
+        <button class="lbtn" id="lb1_E04_ham"  onclick="setLabel(1,'E04','정상')">✅ 정상</button>
+        <button class="lbtn" id="lb1_E04_unk"  onclick="setLabel(1,'E04','모름')">❓ 모르겠음</button>
+      </div>
+    </div>
+    <div class="ecard" id="ec1_E05">
+      <div class="ecard-num">E05</div>
+      <div class="ecard-subj">📧 오늘만 무료! 지금 바로 신청</div>
+      <div class="ecard-body">오늘 하루만 무료로 제공되는 서비스입니다. 지금 바로 신청하시면 할인 혜택도 함께 드립니다.</div>
+      <div class="label-btns">
+        <button class="lbtn" id="lb1_E05_spam" onclick="setLabel(1,'E05','스팸')">📛 스팸</button>
+        <button class="lbtn" id="lb1_E05_ham"  onclick="setLabel(1,'E05','정상')">✅ 정상</button>
+        <button class="lbtn" id="lb1_E05_unk"  onclick="setLabel(1,'E05','모름')">❓ 모르겠음</button>
+      </div>
+    </div>
+    <div class="ecard" id="ec1_E06">
+      <div class="ecard-num">E06</div>
+      <div class="ecard-subj">📧 학교 이벤트 행사 일정 공지</div>
+      <div class="ecard-body">이번 달 학교 이벤트 및 행사 일정을 안내합니다. 체육대회는 다음 주 화요일 진행 예정입니다.</div>
+      <div class="label-btns">
+        <button class="lbtn" id="lb1_E06_spam" onclick="setLabel(1,'E06','스팸')">📛 스팸</button>
+        <button class="lbtn" id="lb1_E06_ham"  onclick="setLabel(1,'E06','정상')">✅ 정상</button>
+        <button class="lbtn" id="lb1_E06_unk"  onclick="setLabel(1,'E06','모름')">❓ 모르겠음</button>
+      </div>
+    </div>
+    <div class="ecard" id="ec1_E07">
+      <div class="ecard-num">E07</div>
+      <div class="ecard-subj">📧 100만원 경품 당첨 확인</div>
+      <div class="ecard-body">축하합니다! 귀하가 경품 행사 당첨자로 선정되셨습니다. 지금 클릭하여 당첨 확인을 해주세요.</div>
+      <div class="label-btns">
+        <button class="lbtn" id="lb1_E07_spam" onclick="setLabel(1,'E07','스팸')">📛 스팸</button>
+        <button class="lbtn" id="lb1_E07_ham"  onclick="setLabel(1,'E07','정상')">✅ 정상</button>
+        <button class="lbtn" id="lb1_E07_unk"  onclick="setLabel(1,'E07','모름')">❓ 모르겠음</button>
+      </div>
+    </div>
+    <div class="ecard" id="ec1_E08">
+      <div class="ecard-num">E08</div>
+      <div class="ecard-subj">📧 동아리 신청 마감 안내</div>
+      <div class="ecard-body">2학기 동아리 신청이 이번 주 금요일 마감됩니다. 신청서를 담임 선생님께 제출해 주세요.</div>
+      <div class="label-btns">
+        <button class="lbtn" id="lb1_E08_spam" onclick="setLabel(1,'E08','스팸')">📛 스팸</button>
+        <button class="lbtn" id="lb1_E08_ham"  onclick="setLabel(1,'E08','정상')">✅ 정상</button>
+        <button class="lbtn" id="lb1_E08_unk"  onclick="setLabel(1,'E08','모름')">❓ 모르겠음</button>
+      </div>
+    </div>
+    <div class="ecard" id="ec1_E09">
+      <div class="ecard-num">E09</div>
+      <div class="ecard-subj">📧 무료 상담 신청하고 혜택 받기</div>
+      <div class="ecard-body">지금 무료 상담을 신청하시면 특별 할인 혜택을 드립니다. 오늘만 가능한 이벤트이니 서두르세요!</div>
+      <div class="label-btns">
+        <button class="lbtn" id="lb1_E09_spam" onclick="setLabel(1,'E09','스팸')">📛 스팸</button>
+        <button class="lbtn" id="lb1_E09_ham"  onclick="setLabel(1,'E09','정상')">✅ 정상</button>
+        <button class="lbtn" id="lb1_E09_unk"  onclick="setLabel(1,'E09','모름')">❓ 모르겠음</button>
+      </div>
+    </div>
+    <div class="ecard" id="ec1_E10">
+      <div class="ecard-num">E10</div>
+      <div class="ecard-subj">📧 급식 메뉴 특별 변경 안내</div>
+      <div class="ecard-body">이번 주 목요일 급식 메뉴가 특별 메뉴로 변경됩니다. 자세한 내용은 학교 홈페이지를 확인해 주세요.</div>
+      <div class="label-btns">
+        <button class="lbtn" id="lb1_E10_spam" onclick="setLabel(1,'E10','스팸')">📛 스팸</button>
+        <button class="lbtn" id="lb1_E10_ham"  onclick="setLabel(1,'E10','정상')">✅ 정상</button>
+        <button class="lbtn" id="lb1_E10_unk"  onclick="setLabel(1,'E10','모름')">❓ 모르겠음</button>
+      </div>
+    </div>
+    </div>
+    <div style="font-size:12px;color:#475569;margin-bottom:4px">분류 완료: <span id="lcnt1" style="color:#60a5fa">0</span>/10</div>
+  </div>
+  <div class="mpanel " id="lp2">
+    <div class="info">팀원3 (판정관) — 각 이메일이 스팸인지 정상인지 판단하세요.</div>
+    <div class="email-grid">
+    <div class="ecard" id="ec2_E01">
+      <div class="ecard-num">E01</div>
+      <div class="ecard-subj">📧 특별 할인! 지금 신청하면 경품 증정</div>
+      <div class="ecard-body">안녕하세요! 이번 주말까지만 진행되는 특별 행사입니다. 지금 신청하시면 경품을 드립니다. 서두르세요!</div>
+      <div class="label-btns">
+        <button class="lbtn" id="lb2_E01_spam" onclick="setLabel(2,'E01','스팸')">📛 스팸</button>
+        <button class="lbtn" id="lb2_E01_ham"  onclick="setLabel(2,'E01','정상')">✅ 정상</button>
+        <button class="lbtn" id="lb2_E01_unk"  onclick="setLabel(2,'E01','모름')">❓ 모르겠음</button>
+      </div>
+    </div>
+    <div class="ecard" id="ec2_E02">
+      <div class="ecard-num">E02</div>
+      <div class="ecard-subj">📧 방과후 무료 강좌 신청 안내</div>
+      <div class="ecard-body">이번 학기 방과후 무료 특별 강좌 신청을 받습니다. 관심 있는 학생은 금요일까지 신청해 주세요.</div>
+      <div class="label-btns">
+        <button class="lbtn" id="lb2_E02_spam" onclick="setLabel(2,'E02','스팸')">📛 스팸</button>
+        <button class="lbtn" id="lb2_E02_ham"  onclick="setLabel(2,'E02','정상')">✅ 정상</button>
+        <button class="lbtn" id="lb2_E02_unk"  onclick="setLabel(2,'E02','모름')">❓ 모르겠음</button>
+      </div>
+    </div>
+    <div class="ecard" id="ec2_E03">
+      <div class="ecard-num">E03</div>
+      <div class="ecard-subj">📧 이벤트 당첨! 지금 클릭하세요</div>
+      <div class="ecard-body">고객님께서 이벤트 경품 당첨자로 선정되셨습니다. 당첨 확인을 위해 지금 클릭하여 정보를 입력해 주세요.</div>
+      <div class="label-btns">
+        <button class="lbtn" id="lb2_E03_spam" onclick="setLabel(2,'E03','스팸')">📛 스팸</button>
+        <button class="lbtn" id="lb2_E03_ham"  onclick="setLabel(2,'E03','정상')">✅ 정상</button>
+        <button class="lbtn" id="lb2_E03_unk"  onclick="setLabel(2,'E03','모름')">❓ 모르겠음</button>
+      </div>
+    </div>
+    <div class="ecard" id="ec2_E04">
+      <div class="ecard-num">E04</div>
+      <div class="ecard-subj">📧 수학여행 비용 납부 안내</div>
+      <div class="ecard-body">수학여행 비용 납부 기한이 다가왔습니다. 이번 주 금요일까지 납부해 주시기 바랍니다.</div>
+      <div class="label-btns">
+        <button class="lbtn" id="lb2_E04_spam" onclick="setLabel(2,'E04','스팸')">📛 스팸</button>
+        <button class="lbtn" id="lb2_E04_ham"  onclick="setLabel(2,'E04','정상')">✅ 정상</button>
+        <button class="lbtn" id="lb2_E04_unk"  onclick="setLabel(2,'E04','모름')">❓ 모르겠음</button>
+      </div>
+    </div>
+    <div class="ecard" id="ec2_E05">
+      <div class="ecard-num">E05</div>
+      <div class="ecard-subj">📧 오늘만 무료! 지금 바로 신청</div>
+      <div class="ecard-body">오늘 하루만 무료로 제공되는 서비스입니다. 지금 바로 신청하시면 할인 혜택도 함께 드립니다.</div>
+      <div class="label-btns">
+        <button class="lbtn" id="lb2_E05_spam" onclick="setLabel(2,'E05','스팸')">📛 스팸</button>
+        <button class="lbtn" id="lb2_E05_ham"  onclick="setLabel(2,'E05','정상')">✅ 정상</button>
+        <button class="lbtn" id="lb2_E05_unk"  onclick="setLabel(2,'E05','모름')">❓ 모르겠음</button>
+      </div>
+    </div>
+    <div class="ecard" id="ec2_E06">
+      <div class="ecard-num">E06</div>
+      <div class="ecard-subj">📧 학교 이벤트 행사 일정 공지</div>
+      <div class="ecard-body">이번 달 학교 이벤트 및 행사 일정을 안내합니다. 체육대회는 다음 주 화요일 진행 예정입니다.</div>
+      <div class="label-btns">
+        <button class="lbtn" id="lb2_E06_spam" onclick="setLabel(2,'E06','스팸')">📛 스팸</button>
+        <button class="lbtn" id="lb2_E06_ham"  onclick="setLabel(2,'E06','정상')">✅ 정상</button>
+        <button class="lbtn" id="lb2_E06_unk"  onclick="setLabel(2,'E06','모름')">❓ 모르겠음</button>
+      </div>
+    </div>
+    <div class="ecard" id="ec2_E07">
+      <div class="ecard-num">E07</div>
+      <div class="ecard-subj">📧 100만원 경품 당첨 확인</div>
+      <div class="ecard-body">축하합니다! 귀하가 경품 행사 당첨자로 선정되셨습니다. 지금 클릭하여 당첨 확인을 해주세요.</div>
+      <div class="label-btns">
+        <button class="lbtn" id="lb2_E07_spam" onclick="setLabel(2,'E07','스팸')">📛 스팸</button>
+        <button class="lbtn" id="lb2_E07_ham"  onclick="setLabel(2,'E07','정상')">✅ 정상</button>
+        <button class="lbtn" id="lb2_E07_unk"  onclick="setLabel(2,'E07','모름')">❓ 모르겠음</button>
+      </div>
+    </div>
+    <div class="ecard" id="ec2_E08">
+      <div class="ecard-num">E08</div>
+      <div class="ecard-subj">📧 동아리 신청 마감 안내</div>
+      <div class="ecard-body">2학기 동아리 신청이 이번 주 금요일 마감됩니다. 신청서를 담임 선생님께 제출해 주세요.</div>
+      <div class="label-btns">
+        <button class="lbtn" id="lb2_E08_spam" onclick="setLabel(2,'E08','스팸')">📛 스팸</button>
+        <button class="lbtn" id="lb2_E08_ham"  onclick="setLabel(2,'E08','정상')">✅ 정상</button>
+        <button class="lbtn" id="lb2_E08_unk"  onclick="setLabel(2,'E08','모름')">❓ 모르겠음</button>
+      </div>
+    </div>
+    <div class="ecard" id="ec2_E09">
+      <div class="ecard-num">E09</div>
+      <div class="ecard-subj">📧 무료 상담 신청하고 혜택 받기</div>
+      <div class="ecard-body">지금 무료 상담을 신청하시면 특별 할인 혜택을 드립니다. 오늘만 가능한 이벤트이니 서두르세요!</div>
+      <div class="label-btns">
+        <button class="lbtn" id="lb2_E09_spam" onclick="setLabel(2,'E09','스팸')">📛 스팸</button>
+        <button class="lbtn" id="lb2_E09_ham"  onclick="setLabel(2,'E09','정상')">✅ 정상</button>
+        <button class="lbtn" id="lb2_E09_unk"  onclick="setLabel(2,'E09','모름')">❓ 모르겠음</button>
+      </div>
+    </div>
+    <div class="ecard" id="ec2_E10">
+      <div class="ecard-num">E10</div>
+      <div class="ecard-subj">📧 급식 메뉴 특별 변경 안내</div>
+      <div class="ecard-body">이번 주 목요일 급식 메뉴가 특별 메뉴로 변경됩니다. 자세한 내용은 학교 홈페이지를 확인해 주세요.</div>
+      <div class="label-btns">
+        <button class="lbtn" id="lb2_E10_spam" onclick="setLabel(2,'E10','스팸')">📛 스팸</button>
+        <button class="lbtn" id="lb2_E10_ham"  onclick="setLabel(2,'E10','정상')">✅ 정상</button>
+        <button class="lbtn" id="lb2_E10_unk"  onclick="setLabel(2,'E10','모름')">❓ 모르겠음</button>
+      </div>
+    </div>
+    </div>
+    <div style="font-size:12px;color:#475569;margin-bottom:4px">분류 완료: <span id="lcnt2" style="color:#a855f7">0</span>/10</div>
+  </div>
+
   <div class="brow">
-    <button class="btn br" onclick="go(2)">확률 계산하기 →</button>
+    <button class="btn br" onclick="gotoCompare()">분류 완료 — 의견 비교 →</button>
   </div>
 </div>
 
-<!-- 2: 확률 계산 -->
+<!-- 2: 의견 비교 -->
 <div class="step" id="s2">
-  <h2>나이브 베이즈 확률표</h2>
-  <div class="sub">학습 데이터에서 단어별 조건부 확률을 계산합니다. (라플라스 스무딩 적용)</div>
-  <div class="info"><strong style="color:#60a5fa">공식</strong> P(단어|클래스) = (등장 횟수 + 1) ÷ (해당 클래스 이메일 수 + V)<br>
-  각 클래스 이메일 수 = 5, V = 5 → 분모 = 10</div>
-  <div class="card">
-    <div style="overflow-x:auto"><table>
-      <thead><tr>
-        <th>단어</th>
-        <th>스팸 중 등장</th><th>P(단어|스팸)</th>
-        <th>정상 중 등장</th><th>P(단어|정상)</th>
-        <th>스팸/정상 비율</th>
-      </tr></thead>
-      <tbody><tr>
-        <td style="font-weight:700;color:#fff">무료</td>
-        <td style="text-align:center">2</td>
-        <td><div class="bar"><div class="bf" style="width:30%;background:#ef4444"></div></div><span class="prob-val" style="color:#ef4444">0.300</span><span style="font-size:10px;color:#555"> (2+1)/10</span></td>
-        <td style="text-align:center">0</td>
-        <td><div class="bar"><div class="bf" style="width:10%;background:#22c55e"></div></div><span class="prob-val" style="color:#22c55e">0.100</span><span style="font-size:10px;color:#555"> (0+1)/10</span></td>
-        <td style="font-weight:700;color:#ef4444">3.0배 ↑스팸</td>
-      </tr>
-<tr>
-        <td style="font-weight:700;color:#fff">이벤트</td>
-        <td style="text-align:center">2</td>
-        <td><div class="bar"><div class="bf" style="width:30%;background:#ef4444"></div></div><span class="prob-val" style="color:#ef4444">0.300</span><span style="font-size:10px;color:#555"> (2+1)/10</span></td>
-        <td style="text-align:center">0</td>
-        <td><div class="bar"><div class="bf" style="width:10%;background:#22c55e"></div></div><span class="prob-val" style="color:#22c55e">0.100</span><span style="font-size:10px;color:#555"> (0+1)/10</span></td>
-        <td style="font-weight:700;color:#ef4444">3.0배 ↑스팸</td>
-      </tr>
-<tr>
-        <td style="font-weight:700;color:#fff">신청</td>
-        <td style="text-align:center">1</td>
-        <td><div class="bar"><div class="bf" style="width:20%;background:#ef4444"></div></div><span class="prob-val" style="color:#ef4444">0.200</span><span style="font-size:10px;color:#555"> (1+1)/10</span></td>
-        <td style="text-align:center">2</td>
-        <td><div class="bar"><div class="bf" style="width:30%;background:#22c55e"></div></div><span class="prob-val" style="color:#22c55e">0.300</span><span style="font-size:10px;color:#555"> (2+1)/10</span></td>
-        <td style="font-weight:700;color:#22c55e">0.67배 ↓정상</td>
-      </tr>
-<tr>
-        <td style="font-weight:700;color:#fff">클릭</td>
-        <td style="text-align:center">2</td>
-        <td><div class="bar"><div class="bf" style="width:30%;background:#ef4444"></div></div><span class="prob-val" style="color:#ef4444">0.300</span><span style="font-size:10px;color:#555"> (2+1)/10</span></td>
-        <td style="text-align:center">0</td>
-        <td><div class="bar"><div class="bf" style="width:10%;background:#22c55e"></div></div><span class="prob-val" style="color:#22c55e">0.100</span><span style="font-size:10px;color:#555"> (0+1)/10</span></td>
-        <td style="font-weight:700;color:#ef4444">3.0배 ↑스팸</td>
-      </tr>
-<tr>
-        <td style="font-weight:700;color:#fff">안내</td>
-        <td style="text-align:center">0</td>
-        <td><div class="bar"><div class="bf" style="width:10%;background:#ef4444"></div></div><span class="prob-val" style="color:#ef4444">0.100</span><span style="font-size:10px;color:#555"> (0+1)/10</span></td>
-        <td style="text-align:center">4</td>
-        <td><div class="bar"><div class="bf" style="width:50%;background:#22c55e"></div></div><span class="prob-val" style="color:#22c55e">0.500</span><span style="font-size:10px;color:#555"> (4+1)/10</span></td>
-        <td style="font-weight:700;color:#22c55e">0.2배 ↓정상</td>
-      </tr>
-      </tbody>
-    </table></div>
-  </div>
-  <div class="warn">
-    <strong>라플라스 스무딩 필요!</strong> 이벤트·클릭·무료는 정상에서 0번 등장 → P=0이 되면 나이브 베이즈 전체 점수가 0이 됩니다.<br>
-    스무딩 적용: (0+1)/(5+5) = 0.100 으로 보정합니다.
-  </div>
-
-  <div class="card">
-    <div style="font-weight:700;color:#fff;margin-bottom:10px">사전 확률 설정</div>
-    <div class="sub" style="margin-bottom:10px">P(스팸)을 선택하세요. (기본값: 0.5)</div>
-    <div class="prior-row">
-      <button class="prior-chip sel" id="pr30" onclick="setPrior(0.3)">P(스팸) = 0.3</button>
-      <button class="prior-chip sel" id="pr50" onclick="setPrior(0.5)">P(스팸) = 0.5 ★기본</button>
-      <button class="prior-chip" id="pr70" onclick="setPrior(0.7)">P(스팸) = 0.7</button>
+  <h2>팀원 간 분류 비교</h2>
+  <div class="sub">팀원 3명의 판단을 비교합니다. <strong style="color:#eab308">★ 표시</strong>된 이메일은 의견이 갈렸습니다. 왜 다르게 판단했는지 이야기해 보세요.</div>
+  <div id="compareTable"></div>
+  <div class="card" style="margin-top:4px">
+    <div style="font-weight:700;color:#fff;margin-bottom:10px">💬 잠깐, 토론해 봅시다</div>
+    <div style="font-size:13px;color:#94a3b8;line-height:1.8">
+      의견이 갈린 이메일에 대해 각자 왜 그렇게 판단했는지 이야기해 보세요.<br>
+      "스팸처럼 보이는 단어가 있었나요?" "정상적인 맥락이 있었나요?"<br>
+      <strong style="color:#fff">합의가 안 돼도 괜찮습니다. — 그게 이 실습의 핵심입니다.</strong>
     </div>
-    <div id="priorNote" style="font-size:13px;color:#94a3b8;margin-top:8px">현재: P(스팸) = 0.5, P(정상) = 0.5</div>
   </div>
-
   <div class="brow">
     <button class="btn bg" onclick="go(1)">← 이전</button>
-    <button class="btn br" onclick="go(3)">테스트 이메일 분류하기 →</button>
+    <button class="btn br" onclick="go(3)">키워드 선택하기 →</button>
   </div>
 </div>
 
-<!-- 3: 테스트 -->
+<!-- 3: 키워드 선택 -->
 <div class="step" id="s3">
-  <h2>테스트 이메일 분류</h2>
-  <div class="sub">학습 때 보지 않은 이메일 6개를 단일 증거(무료 단어 1개)와 복합 증거(나이브 베이즈)로 각각 분류합니다.</div>
-
-  <div class="card">
-    <div style="font-weight:700;color:#fff;margin-bottom:6px">현재 사전 확률: <span id="priorDisplay" style="color:#60a5fa">P(스팸)=0.5</span></div>
-    <div style="overflow-x:auto"><table>
-      <thead><tr>
-        <th>번호</th><th>이메일 제목</th><th>실제 정답</th><th>포함 단어</th>
-        <th style="color:#f97316">단일 증거<br>(무료 유무)</th>
-        <th style="color:#f97316">단일 판정</th>
-        <th style="color:#3b82f6">복합 증거<br>P(스팸|이메일)</th>
-        <th style="color:#3b82f6">복합 판정</th>
-      </tr></thead>
-      <tbody id="testTableBody"></tbody>
-    </table></div>
-    <div style="margin-top:10px;font-size:12px;color:#475569">* 단일 증거: 무료 포함 시 P(스팸|무료), 미포함 시 P(스팸|¬무료)</div>
+  <h2>키워드 선택</h2>
+  <div class="sub">
+    <strong style="color:#fff">내가 붙인 레이블을 기준으로</strong> 스팸을 구별할 키워드 5개를 고르세요.<br>
+    <span style="color:#eab308">⚠ 레이블이 다르면 같은 단어도 다른 확률로 계산됩니다!</span>
   </div>
-
-  <div class="card">
-    <div style="font-weight:700;color:#fff;margin-bottom:12px">정확도 비교</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-      <div style="text-align:center;padding:14px;border-radius:9px;background:rgba(249,115,22,.1);border:1px solid rgba(249,115,22,.3)">
-        <div style="font-size:11px;color:#f97316;margin-bottom:4px">단일 증거</div>
-        <div id="acc1" style="font-size:28px;font-weight:900;color:#f97316">—</div>
-        <div style="font-size:11px;color:#666">정확도</div>
+  <div class="mtabs">
+    <button class="mtab" id="kt0" onclick="showKwMember(0)" style="background:rgba(229,9,20,.12);border-color:#ff4d57;color:#ff4d57">팀원1</button>
+    <button class="mtab" id="kt1" onclick="showKwMember(1)">팀원2</button>
+    <button class="mtab" id="kt2" onclick="showKwMember(2)">팀원3</button>
+  </div>
+  <div class="mpanel show" id="kp0">
+    <div class="card" style="border-color:#ff4d5744">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+        <div style="width:34px;height:34px;border-radius:8px;background:rgba(229,9,20,.12);display:flex;align-items:center;justify-content:center;font-size:17px">📊</div>
+        <div style="flex:1">
+          <div style="font-weight:700;color:#ff4d57" id="kmlabel0">팀원1</div>
+          <div style="font-size:11px;color:#94a3b8" id="kminfo0">내 레이블 기준으로 선택</div>
+        </div>
+        <div style="font-size:13px;font-weight:700">선택: <span id="kwcnt0" style="color:#ff4d57">0</span>/5</div>
       </div>
-      <div style="text-align:center;padding:14px;border-radius:9px;background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.3)">
-        <div style="font-size:11px;color:#3b82f6;margin-bottom:4px">복합 증거</div>
-        <div id="acc2" style="font-size:28px;font-weight:900;color:#3b82f6">—</div>
-        <div style="font-size:11px;color:#666">정확도</div>
+      <label>선택한 키워드</label>
+      <div class="sel-preview" id="selPrev0"><span class="empty-hint">아래 단어를 클릭하여 선택하세요.</span></div>
+      <label style="margin-top:10px">이메일 본문에서 추출한 단어 (클릭하여 선택)</label>
+      <div class="wcloud" id="wcloud0">
+        <div class="wtoken" id="wt0_0" onclick="toggleKw(0,0)"><span>지금</span><span class="wchk">✓</span></div>
+        <div class="wtoken" id="wt0_1" onclick="toggleKw(0,1)"><span>클릭</span><span class="wchk">✓</span></div>
+        <div class="wtoken" id="wt0_2" onclick="toggleKw(0,2)"><span>당첨</span><span class="wchk">✓</span></div>
+        <div class="wtoken" id="wt0_3" onclick="toggleKw(0,3)"><span>경품</span><span class="wchk">✓</span></div>
+        <div class="wtoken" id="wt0_4" onclick="toggleKw(0,4)"><span>무료</span><span class="wchk">✓</span></div>
+        <div class="wtoken" id="wt0_5" onclick="toggleKw(0,5)"><span>신청</span><span class="wchk">✓</span></div>
+        <div class="wtoken" id="wt0_6" onclick="toggleKw(0,6)"><span>이벤트</span><span class="wchk">✓</span></div>
+        <div class="wtoken" id="wt0_7" onclick="toggleKw(0,7)"><span>특별</span><span class="wchk">✓</span></div>
+        <div class="wtoken" id="wt0_8" onclick="toggleKw(0,8)"><span>할인</span><span class="wchk">✓</span></div>
+        <div class="wtoken" id="wt0_9" onclick="toggleKw(0,9)"><span>마감</span><span class="wchk">✓</span></div>
+        <div class="wtoken" id="wt0_10" onclick="toggleKw(0,10)"><span>안내</span><span class="wchk">✓</span></div>
+        <div class="wtoken" id="wt0_11" onclick="toggleKw(0,11)"><span>학교</span><span class="wchk">✓</span></div>
+        <div class="wtoken" id="wt0_12" onclick="toggleKw(0,12)"><span>행사</span><span class="wchk">✓</span></div>
+        <div class="wtoken" id="wt0_13" onclick="toggleKw(0,13)"><span>공지</span><span class="wchk">✓</span></div>
+        <div class="wtoken" id="wt0_14" onclick="toggleKw(0,14)"><span>급식</span><span class="wchk">✓</span></div>
       </div>
+      <div style="margin-top:12px;padding-top:12px;border-top:1px solid #2a2a3e">
+        <div style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:#666;margin-bottom:6px">기타 — 직접 단어 추가</div>
+        <div style="display:flex;gap:7px;align-items:center">
+          <input type="text" id="custom0" placeholder="학습 이메일에서 찾고 싶은 단어 입력"
+            style="background:#1e1e2e;border:1px solid #3a3a55;border-radius:7px;padding:7px 10px;color:#e8e8f0;font-family:inherit;font-size:13px;flex:1;outline:none"
+            onkeydown="if(event.key==='Enter')addCustom(0)">
+          <button onclick="addCustom(0)" style="padding:7px 16px;border-radius:7px;border:none;background:#ff4d57;color:#fff;font-size:13px;font-weight:700;cursor:pointer">추가</button>
+        </div>
+        <div style="font-size:11px;color:#475569;margin-top:5px">* 학습 이메일 본문에서 자동으로 등장 횟수를 셉니다. (선택 시 숨김, 정답 공개 단계에서 확인)</div>
+        <div class="wcloud" id="cwcloud0" style="margin-top:8px"></div>
+      </div>
+      <div style="font-size:11px;color:#333;margin-top:6px">* 제시 단어 + 기타 합쳐서 최대 5개</div>
+    </div>
+  </div>
+  <div class="mpanel " id="kp1">
+    <div class="card" style="border-color:#60a5fa44">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+        <div style="width:34px;height:34px;border-radius:8px;background:rgba(59,130,246,.12);display:flex;align-items:center;justify-content:center;font-size:17px">🧮</div>
+        <div style="flex:1">
+          <div style="font-weight:700;color:#60a5fa" id="kmlabel1">팀원2</div>
+          <div style="font-size:11px;color:#94a3b8" id="kminfo1">내 레이블 기준으로 선택</div>
+        </div>
+        <div style="font-size:13px;font-weight:700">선택: <span id="kwcnt1" style="color:#60a5fa">0</span>/5</div>
+      </div>
+      <label>선택한 키워드</label>
+      <div class="sel-preview" id="selPrev1"><span class="empty-hint">아래 단어를 클릭하여 선택하세요.</span></div>
+      <label style="margin-top:10px">이메일 본문에서 추출한 단어 (클릭하여 선택)</label>
+      <div class="wcloud" id="wcloud1">
+        <div class="wtoken" id="wt1_0" onclick="toggleKw(1,0)"><span>지금</span><span class="wchk">✓</span></div>
+        <div class="wtoken" id="wt1_1" onclick="toggleKw(1,1)"><span>클릭</span><span class="wchk">✓</span></div>
+        <div class="wtoken" id="wt1_2" onclick="toggleKw(1,2)"><span>당첨</span><span class="wchk">✓</span></div>
+        <div class="wtoken" id="wt1_3" onclick="toggleKw(1,3)"><span>경품</span><span class="wchk">✓</span></div>
+        <div class="wtoken" id="wt1_4" onclick="toggleKw(1,4)"><span>무료</span><span class="wchk">✓</span></div>
+        <div class="wtoken" id="wt1_5" onclick="toggleKw(1,5)"><span>신청</span><span class="wchk">✓</span></div>
+        <div class="wtoken" id="wt1_6" onclick="toggleKw(1,6)"><span>이벤트</span><span class="wchk">✓</span></div>
+        <div class="wtoken" id="wt1_7" onclick="toggleKw(1,7)"><span>특별</span><span class="wchk">✓</span></div>
+        <div class="wtoken" id="wt1_8" onclick="toggleKw(1,8)"><span>할인</span><span class="wchk">✓</span></div>
+        <div class="wtoken" id="wt1_9" onclick="toggleKw(1,9)"><span>마감</span><span class="wchk">✓</span></div>
+        <div class="wtoken" id="wt1_10" onclick="toggleKw(1,10)"><span>안내</span><span class="wchk">✓</span></div>
+        <div class="wtoken" id="wt1_11" onclick="toggleKw(1,11)"><span>학교</span><span class="wchk">✓</span></div>
+        <div class="wtoken" id="wt1_12" onclick="toggleKw(1,12)"><span>행사</span><span class="wchk">✓</span></div>
+        <div class="wtoken" id="wt1_13" onclick="toggleKw(1,13)"><span>공지</span><span class="wchk">✓</span></div>
+        <div class="wtoken" id="wt1_14" onclick="toggleKw(1,14)"><span>급식</span><span class="wchk">✓</span></div>
+      </div>
+      <div style="margin-top:12px;padding-top:12px;border-top:1px solid #2a2a3e">
+        <div style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:#666;margin-bottom:6px">기타 — 직접 단어 추가</div>
+        <div style="display:flex;gap:7px;align-items:center">
+          <input type="text" id="custom1" placeholder="학습 이메일에서 찾고 싶은 단어 입력"
+            style="background:#1e1e2e;border:1px solid #3a3a55;border-radius:7px;padding:7px 10px;color:#e8e8f0;font-family:inherit;font-size:13px;flex:1;outline:none"
+            onkeydown="if(event.key==='Enter')addCustom(1)">
+          <button onclick="addCustom(1)" style="padding:7px 16px;border-radius:7px;border:none;background:#60a5fa;color:#fff;font-size:13px;font-weight:700;cursor:pointer">추가</button>
+        </div>
+        <div style="font-size:11px;color:#475569;margin-top:5px">* 학습 이메일 본문에서 자동으로 등장 횟수를 셉니다. (선택 시 숨김, 정답 공개 단계에서 확인)</div>
+        <div class="wcloud" id="cwcloud1" style="margin-top:8px"></div>
+      </div>
+      <div style="font-size:11px;color:#333;margin-top:6px">* 제시 단어 + 기타 합쳐서 최대 5개</div>
+    </div>
+  </div>
+  <div class="mpanel " id="kp2">
+    <div class="card" style="border-color:#a855f744">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+        <div style="width:34px;height:34px;border-radius:8px;background:rgba(168,85,247,.12);display:flex;align-items:center;justify-content:center;font-size:17px">🎯</div>
+        <div style="flex:1">
+          <div style="font-weight:700;color:#a855f7" id="kmlabel2">팀원3</div>
+          <div style="font-size:11px;color:#94a3b8" id="kminfo2">내 레이블 기준으로 선택</div>
+        </div>
+        <div style="font-size:13px;font-weight:700">선택: <span id="kwcnt2" style="color:#a855f7">0</span>/5</div>
+      </div>
+      <label>선택한 키워드</label>
+      <div class="sel-preview" id="selPrev2"><span class="empty-hint">아래 단어를 클릭하여 선택하세요.</span></div>
+      <label style="margin-top:10px">이메일 본문에서 추출한 단어 (클릭하여 선택)</label>
+      <div class="wcloud" id="wcloud2">
+        <div class="wtoken" id="wt2_0" onclick="toggleKw(2,0)"><span>지금</span><span class="wchk">✓</span></div>
+        <div class="wtoken" id="wt2_1" onclick="toggleKw(2,1)"><span>클릭</span><span class="wchk">✓</span></div>
+        <div class="wtoken" id="wt2_2" onclick="toggleKw(2,2)"><span>당첨</span><span class="wchk">✓</span></div>
+        <div class="wtoken" id="wt2_3" onclick="toggleKw(2,3)"><span>경품</span><span class="wchk">✓</span></div>
+        <div class="wtoken" id="wt2_4" onclick="toggleKw(2,4)"><span>무료</span><span class="wchk">✓</span></div>
+        <div class="wtoken" id="wt2_5" onclick="toggleKw(2,5)"><span>신청</span><span class="wchk">✓</span></div>
+        <div class="wtoken" id="wt2_6" onclick="toggleKw(2,6)"><span>이벤트</span><span class="wchk">✓</span></div>
+        <div class="wtoken" id="wt2_7" onclick="toggleKw(2,7)"><span>특별</span><span class="wchk">✓</span></div>
+        <div class="wtoken" id="wt2_8" onclick="toggleKw(2,8)"><span>할인</span><span class="wchk">✓</span></div>
+        <div class="wtoken" id="wt2_9" onclick="toggleKw(2,9)"><span>마감</span><span class="wchk">✓</span></div>
+        <div class="wtoken" id="wt2_10" onclick="toggleKw(2,10)"><span>안내</span><span class="wchk">✓</span></div>
+        <div class="wtoken" id="wt2_11" onclick="toggleKw(2,11)"><span>학교</span><span class="wchk">✓</span></div>
+        <div class="wtoken" id="wt2_12" onclick="toggleKw(2,12)"><span>행사</span><span class="wchk">✓</span></div>
+        <div class="wtoken" id="wt2_13" onclick="toggleKw(2,13)"><span>공지</span><span class="wchk">✓</span></div>
+        <div class="wtoken" id="wt2_14" onclick="toggleKw(2,14)"><span>급식</span><span class="wchk">✓</span></div>
+      </div>
+      <div style="margin-top:12px;padding-top:12px;border-top:1px solid #2a2a3e">
+        <div style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:#666;margin-bottom:6px">기타 — 직접 단어 추가</div>
+        <div style="display:flex;gap:7px;align-items:center">
+          <input type="text" id="custom2" placeholder="학습 이메일에서 찾고 싶은 단어 입력"
+            style="background:#1e1e2e;border:1px solid #3a3a55;border-radius:7px;padding:7px 10px;color:#e8e8f0;font-family:inherit;font-size:13px;flex:1;outline:none"
+            onkeydown="if(event.key==='Enter')addCustom(2)">
+          <button onclick="addCustom(2)" style="padding:7px 16px;border-radius:7px;border:none;background:#a855f7;color:#fff;font-size:13px;font-weight:700;cursor:pointer">추가</button>
+        </div>
+        <div style="font-size:11px;color:#475569;margin-top:5px">* 학습 이메일 본문에서 자동으로 등장 횟수를 셉니다. (선택 시 숨김, 정답 공개 단계에서 확인)</div>
+        <div class="wcloud" id="cwcloud2" style="margin-top:8px"></div>
+      </div>
+      <div style="font-size:11px;color:#333;margin-top:6px">* 제시 단어 + 기타 합쳐서 최대 5개</div>
     </div>
   </div>
 
   <div class="brow">
     <button class="btn bg" onclick="go(2)">← 이전</button>
-    <button class="btn br" onclick="go(4)">비교 분석 →</button>
+    <button class="btn br" onclick="gotoReveal()">선택 완료 — 정답 공개 →</button>
   </div>
 </div>
 
-<!-- 4: 비교 분석 -->
+<!-- 4: 정답 공개 -->
 <div class="step" id="s4">
-  <h2>비교 분석 &amp; 토론</h2>
-  <div class="sub">단일 증거와 복합 증거의 결과 차이를 분석하고, 나이브 베이즈의 원리를 정리합니다.</div>
-
-  <div class="card">
-    <div style="font-weight:700;color:#fff;margin-bottom:14px">★ 결과가 달라진 이메일 분석</div>
-    <div id="contrastOut">테스트를 먼저 실행하세요.</div>
-  </div>
-
-  <div class="card">
-    <div style="font-weight:700;color:#fff;margin-bottom:12px">핵심 개념 정리</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:13px">
-      <div style="padding:12px;background:#1e1e2e;border-radius:8px;border-left:3px solid #f97316">
-        <div style="font-weight:700;color:#f97316;margin-bottom:6px">단일 증거 (베이즈 정리)</div>
-        <div style="color:#94a3b8;line-height:1.7">단어 1개(무료)만 증거로 사용.<br>무료가 없는 스팸을 잡지 못하고,<br>무료가 있는 정상 메일을 오분류함.</div>
-      </div>
-      <div style="padding:12px;background:#1e1e2e;border-radius:8px;border-left:3px solid #3b82f6">
-        <div style="font-weight:700;color:#3b82f6;margin-bottom:6px">복합 증거 (나이브 베이즈)</div>
-        <div style="color:#94a3b8;line-height:1.7">여러 단어의 우도를 모두 곱함.<br>각 단어가 독립이라는 '나이브 가정'으로<br>계산을 단순화하지만 실제로도 잘 작동함.</div>
-      </div>
-    </div>
-    <div style="margin-top:10px;padding:10px 12px;background:#1e1e2e;border-radius:8px;font-size:13px;color:#94a3b8;line-height:1.7">
-      <strong style="color:#fff">나이브 베이즈 공식</strong><br>
-      P(스팸|이메일) ∝ P(스팸) × P(단어₁|스팸) × P(단어₂|스팸) × …<br>
-      P(스팸|이메일) = 스팸점수 ÷ (스팸점수 + 정상점수)
-    </div>
-  </div>
-
-  <div class="card">
-    <div style="font-weight:700;color:#fff;margin-bottom:12px">💬 팀 토론 질문</div>
-    <div class="dq"><div class="qn" style="color:#60a5fa">Q1</div>단일 증거가 틀린 이메일은 어느 것이었나요? 왜 틀렸을까요?</div>
-    <div class="dq"><div class="qn" style="color:#f97316">Q2</div>'신청' 단어는 스팸보다 정상에서 더 많이 등장합니다(0.67배). 그런데 이벤트+신청이 동시에 있으면 스팸 점수가 올라갈까요, 내려갈까요?</div>
-    <div class="dq"><div class="qn" style="color:#a855f7">Q3</div>사전 확률 P(스팸)을 0.3으로 바꾸면 결과가 어떻게 달라지나요? Step 2에서 바꿔보고 결과를 비교해 보세요.</div>
-    <div class="dq"><div class="qn" style="color:#22c55e">Q4</div>학습 데이터가 10개밖에 없습니다. 라플라스 스무딩이 없다면 어떤 문제가 생길까요?</div>
-  </div>
-
+  <h2>🔓 정답 공개 — 공식 레이블 vs 내 레이블</h2>
+  <div class="sub">공식 레이블과 내 레이블을 비교합니다. 그리고 레이블에 따라 단어 확률이 어떻게 달라지는지 확인합니다.</div>
+  <div id="revealContent"></div>
   <div class="brow">
     <button class="btn bg" onclick="go(3)">← 이전</button>
+    <button class="btn br" onclick="go(5)">테스트 이메일 분류하기 →</button>
+  </div>
+</div>
+
+<!-- 5: 테스트 -->
+<div class="step" id="s5">
+  <h2>테스트 이메일 분류</h2>
+  <div class="sub">팀원 3명의 필터로 새 이메일 6개를 분류합니다. 성능은 <strong style="color:#fff">공식 레이블</strong> 기준으로 평가합니다.</div>
+  <div class="card">
+    <div style="font-weight:700;color:#fff;margin-bottom:10px">선택한 키워드 요약</div>
+    <div id="kwSummary"></div>
+  </div>
+  <div class="card">
+    <div style="overflow-x:auto"><table>
+      <thead><tr>
+        <th>번호</th><th>이메일 제목</th><th>실제(공식)</th><th>포함 단어</th>
+        <th id="th0" style="color:#ff4d57">팀원1</th>
+        <th id="th1" style="color:#60a5fa">팀원2</th>
+        <th id="th2" style="color:#a855f7">팀원3</th>
+      </tr></thead>
+      <tbody id="testBody"></tbody>
+    </table></div>
+  </div>
+  <div style="font-weight:700;color:#fff;margin:14px 0 8px">정확도 비교</div>
+  <div class="acc-grid" id="accGrid"></div>
+  <div class="brow">
+    <button class="btn bg" onclick="go(4)">← 이전</button>
+    <button class="btn br" onclick="go(6)">비교 분석 →</button>
+  </div>
+</div>
+
+<!-- 6: 비교 분석 -->
+<div class="step" id="s6">
+  <h2>비교 분석 &amp; 토론</h2>
+  <div class="sub">레이블링의 차이가 필터 성능에 어떤 영향을 미쳤는지 분석합니다.</div>
+  <div id="analysisOut"></div>
+  <div class="card">
+    <div style="font-weight:700;color:#fff;margin-bottom:12px">💬 팀 토론 질문</div>
+    <div class="dq"><div class="qn" style="color:#60a5fa">Q1</div>공식 레이블과 내 레이블이 달랐던 이메일이 있었나요? 왜 다르게 판단했나요?</div>
+    <div class="dq"><div class="qn" style="color:#f97316">Q2</div>같은 이메일인데 레이블이 다르면 단어의 P(단어|스팸)이 왜 달라지나요? 예를 들어 설명해 보세요.</div>
+    <div class="dq"><div class="qn" style="color:#a855f7">Q3</div>실제 Gmail 스팸 필터는 어떻게 레이블 문제를 해결할까요? 사용자 신고 버튼의 역할은?</div>
+    <div class="dq"><div class="qn" style="color:#22c55e">Q4</div>AI가 "틀렸다"고 할 때, 그 틀림의 원인은 알고리즘일까요, 데이터일까요?</div>
+  </div>
+  <div class="brow">
+    <button class="btn bg" onclick="go(5)">← 이전</button>
     <button class="btn br" onclick="resetAll()">처음으로 ↺</button>
   </div>
 </div>
 
 </div>
+
 <script>
-var WORDS = ['무료','이벤트','신청','클릭','안내'];
-var WD = {
-  '무료':  {cs:2, cn:0},
-  '이벤트':{cs:2, cn:0},
-  '신청':  {cs:1, cn:2},
-  '클릭':  {cs:2, cn:0},
-  '안내':  {cs:0, cn:4}
-};
-var TEST = [  {id:'T1',text:'무료 쿠폰 발급 — 오늘만 가능합니다',label:'스팸',words:['무료']},
-  {id:'T2',text:'무료 체험판 신청하고 선물 받아가세요',label:'스팸',words:['무료','신청']},
-  {id:'T3',text:'당신만을 위한 특별 할인 이벤트',label:'스팸',words:['이벤트']},
-  {id:'T4',text:'동아리 신청 및 안내',label:'정상',words:['신청','안내']},
-  {id:'T5',text:'이벤트 클릭하고 상품 신청하세요!',label:'스팸',words:['이벤트','클릭','신청']},
-  {id:'T6',text:'졸업앨범 촬영 일정 안내',label:'정상',words:['안내']},
-];
-var STEPS = ['소개','학습 데이터','확률 계산','테스트','비교 분석'];
-var curStep = 0;
-var unlocked = {0:true,1:true,2:true,3:true,4:true};
-var prior = 0.5;
+
+// ── 기타 단어 직접 추가 ────────────────────────────────────────────────────────
+var customWords = [[], [], []]; // customWords[mi] = [{w,sc,nc}, ...]
+var customSelected = [[], [], []]; // customSelected[mi] = [w, ...]
+
+function countInEmails(word) {
+  var sc = 0, nc = 0;
+  EMAILS.forEach(function(e) {
+    var text = (e.subject + ' ' + e.body).toLowerCase();
+    var w = word.toLowerCase();
+    if (text.indexOf(w) >= 0) {
+      if (e.official === '스팸') sc++;
+      else nc++;
+    }
+  });
+  return {sc: sc, nc: nc};
+}
+
+function addCustom(mi) {
+  var inp = document.getElementById('custom' + mi);
+  var word = inp.value.trim();
+  if (!word) return;
+
+  // 중복 체크 (제시 단어 + 이미 추가된 단어)
+  var allW = WORDS.concat(customWords[mi].map(function(c){return c.w;}));
+  if (allW.indexOf(word) >= 0) {
+    inp.style.borderColor = '#ef4444';
+    inp.placeholder = '이미 있는 단어입니다';
+    setTimeout(function(){inp.style.borderColor='#3a3a55';inp.placeholder='학습 이메일에서 찾고 싶은 단어 입력';}, 1500);
+    inp.value = '';
+    return;
+  }
+
+  // 총 선택 개수 체크 (제시+기타 합산)
+  var total = selected[mi].length + customSelected[mi].length;
+  if (total >= 5) {
+    inp.style.borderColor = '#ef4444';
+    inp.placeholder = '최대 5개까지 선택 가능합니다';
+    setTimeout(function(){inp.style.borderColor='#3a3a55';inp.placeholder='학습 이메일에서 찾고 싶은 단어 입력';}, 1500);
+    inp.value = '';
+    return;
+  }
+
+  // 등장 횟수 자동 계산 (숨김)
+  var counts = countInEmails(word);
+  customWords[mi].push({w: word, sc: counts.sc, nc: counts.nc});
+  customSelected[mi].push(word);
+
+  inp.value = '';
+  renderCustomCloud(mi);
+  updateKwCount(mi);
+  renderSelPrev(mi);
+}
+
+function removeCustomByAttr(btn) {
+  var mi = parseInt(btn.getAttribute('data-mi'));
+  var word = btn.getAttribute('data-w');
+  removeCustom(mi, word);
+}
+
+function removeCustom(mi, word) {
+  customWords[mi]    = customWords[mi].filter(function(c){return c.w !== word;});
+  customSelected[mi] = customSelected[mi].filter(function(w){return w !== word;});
+  renderCustomCloud(mi);
+  updateKwCount(mi);
+  renderSelPrev(mi);
+}
+
+function renderCustomCloud(mi) {
+  var mc = ['#ff4d57','#60a5fa','#a855f7'][mi];
+  var mb = ['rgba(229,9,20,.12)','rgba(59,130,246,.12)','rgba(168,85,247,.12)'][mi];
+  var el = document.getElementById('cwcloud' + mi);
+  if (!el) return;
+  if (!customSelected[mi].length) { el.innerHTML = ''; return; }
+  el.innerHTML = customSelected[mi].map(function(w) {
+    return '<div style="display:inline-flex;align-items:center;gap:5px;padding:7px 12px;border-radius:8px;border:1px solid '+mc+';background:'+mb+';margin:2px">'
+      + '<span style="font-size:13px;font-weight:700;color:'+mc+'">'+w+'</span>'
+      + '<button data-mi="'+mi+'" data-w="'+w+'" onclick="removeCustomByAttr(this)" style="background:none;border:none;color:'+mc+';cursor:pointer;font-size:14px;line-height:1;padding:0">×</button>'
+      + '</div>';
+  }).join('');
+}
+
+function updateKwCount(mi) {
+  var total = selected[mi].length + customSelected[mi].length;
+  var el = document.getElementById('kwcnt' + mi);
+  if (el) { el.innerText = total; el.style.color = ['#ff4d57','#60a5fa','#a855f7'][mi]; }
+}
+
+function getAllSelectedWords(mi) {
+  return WORDS.filter(function(w, wi) { return selected[mi].indexOf(wi) >= 0; })
+    .concat(customSelected[mi]);
+}
+
+function getAllWordData(mi) {
+  // 제시 단어
+  var result = WORDS.map(function(w, wi) {
+    if (selected[mi].indexOf(wi) < 0) return null;
+    // 학습 이메일 기준 카운트 계산
+    var counts = countInEmails(w);
+    return {w: w, sc: counts.sc, nc: counts.nc, isCustom: false};
+  }).filter(Boolean);
+  // 기타 단어
+  customWords[mi].forEach(function(c) {
+    result.push({w: c.w, sc: c.sc, nc: c.nc, isCustom: true});
+  });
+  return result;
+}
+
+var EMAILS = [{"id": "E01", "subject": "특별 할인! 지금 신청하면 경품 증정", "body": "안녕하세요! 이번 주말까지만 진행되는 특별 행사입니다. 지금 신청하시면 경품을 드립니다. 서두르세요!", "official": "스팸", "words": ["특별", "지금", "신청", "경품"]}, {"id": "E02", "subject": "방과후 무료 강좌 신청 안내", "body": "이번 학기 방과후 무료 특별 강좌 신청을 받습니다. 관심 있는 학생은 금요일까지 신청해 주세요.", "official": "정상", "words": ["방과후", "무료", "특별", "신청", "안내"]}, {"id": "E03", "subject": "이벤트 당첨! 지금 클릭하세요", "body": "고객님께서 이벤트 경품 당첨자로 선정되셨습니다. 당첨 확인을 위해 지금 클릭하여 정보를 입력해 주세요.", "official": "스팸", "words": ["이벤트", "경품", "당첨", "지금", "클릭"]}, {"id": "E04", "subject": "수학여행 비용 납부 안내", "body": "수학여행 비용 납부 기한이 다가왔습니다. 이번 주 금요일까지 납부해 주시기 바랍니다.", "official": "정상", "words": ["안내"]}, {"id": "E05", "subject": "오늘만 무료! 지금 바로 신청", "body": "오늘 하루만 무료로 제공되는 서비스입니다. 지금 바로 신청하시면 할인 혜택도 함께 드립니다.", "official": "스팸", "words": ["무료", "지금", "신청", "할인"]}, {"id": "E06", "subject": "학교 이벤트 행사 일정 공지", "body": "이번 달 학교 이벤트 및 행사 일정을 안내합니다. 체육대회는 다음 주 화요일 진행 예정입니다.", "official": "정상", "words": ["학교", "이벤트", "행사", "공지", "안내"]}, {"id": "E07", "subject": "100만원 경품 당첨 확인", "body": "축하합니다! 귀하가 경품 행사 당첨자로 선정되셨습니다. 지금 클릭하여 당첨 확인을 해주세요.", "official": "스팸", "words": ["경품", "당첨", "지금", "클릭", "행사"]}, {"id": "E08", "subject": "동아리 신청 마감 안내", "body": "2학기 동아리 신청이 이번 주 금요일 마감됩니다. 신청서를 담임 선생님께 제출해 주세요.", "official": "정상", "words": ["신청", "마감", "안내"]}, {"id": "E09", "subject": "무료 상담 신청하고 혜택 받기", "body": "지금 무료 상담을 신청하시면 특별 할인 혜택을 드립니다. 오늘만 가능한 이벤트이니 서두르세요!", "official": "스팸", "words": ["무료", "신청", "특별", "할인", "이벤트", "지금"]}, {"id": "E10", "subject": "급식 메뉴 특별 변경 안내", "body": "이번 주 목요일 급식 메뉴가 특별 메뉴로 변경됩니다. 자세한 내용은 학교 홈페이지를 확인해 주세요.", "official": "정상", "words": ["급식", "특별", "안내", "학교"]}];
+var TEST   = [{"id": "T1", "text": "무료 강습 신청 안내", "label": "정상", "words": ["무료", "신청", "안내"]}, {"id": "T2", "text": "이벤트 경품 당첨 클릭", "label": "스팸", "words": ["이벤트", "경품", "당첨", "클릭"]}, {"id": "T3", "text": "학교 특별 행사 이벤트 안내", "label": "정상", "words": ["학교", "특별", "행사", "이벤트", "안내"]}, {"id": "T4", "text": "지금 바로 무료 신청하세요", "label": "스팸", "words": ["지금", "무료", "신청"]}, {"id": "T5", "text": "동아리 마감 안내 공지", "label": "정상", "words": ["마감", "안내", "공지"]}, {"id": "T6", "text": "할인 이벤트 지금 클릭 당첨", "label": "스팸", "words": ["할인", "이벤트", "지금", "클릭", "당첨"]}];
+var WORDS  = ["지금", "클릭", "당첨", "경품", "무료", "신청", "이벤트", "특별", "할인", "마감", "안내", "학교", "행사", "공지", "급식"];
+var MC  = ['#ff4d57','#60a5fa','#a855f7'];
+var MB  = ['rgba(229,9,20,.12)','rgba(59,130,246,.12)','rgba(168,85,247,.12)'];
+var ICONS=['📊','🧮','🎯'];
+var ROLES=['데이터 수집가','확률 계산가','판정관'];
+var STEPS=['소개','레이블링','의견 비교','키워드 선택','정답 공개','테스트','비교 분석'];
+
+// 상태
+var curStep=0;
+var unlocked={0:true,1:true,2:true,3:true,4:true,5:true,6:true};
+// labels[mi][eid] = '스팸'|'정상'|'모름'|null
+var labels=[[],[],[]];
+EMAILS.forEach(function(e){
+  for(var i=0;i<3;i++) labels[i].push(null);
+});
+var selected=[[],[],[]]; // selected[mi] = [wi, ...]
+var mnames=['팀원1','팀원2','팀원3'];
+var curLabelMember=0, curKwMember=0, curRevealMember=0;
 
 function buildNav(){
   var h='';
   for(var i=0;i<STEPS.length;i++){
-    var cls = i===curStep?'nbtn on':unlocked[i]?'nbtn done':'nbtn locked';
-    h += '<button class="'+cls+'" onclick="go('+i+')">'+STEPS[i]+'</button>';
+    var cls=i===curStep?'nbtn on':'nbtn done';
+    h+='<button class="'+cls+'" onclick="go('+i+')">'+STEPS[i]+'</button>';
   }
   document.getElementById('nav').innerHTML=h;
 }
 function go(n){
-  if(n>0&&!unlocked[n])return;
   curStep=n;
-  for(var i=0;i<5;i++){var e=document.getElementById('s'+i);if(e)e.className='step'+(i===n?' on':'');}
+  for(var i=0;i<7;i++){var e=document.getElementById('s'+i);if(e)e.className='step'+(i===n?' on':'');}
   buildNav();
-  if(n===3) renderTest();
-  if(n===4) renderContrast();
+  if(n===2) renderCompare();
+  if(n===4) renderReveal(0);
+  if(n===5) renderTest();
+  if(n===6) renderAnalysis();
   window.scrollTo(0,0);
 }
-function unk(n){unlocked[n]=true;}
 buildNav();
 
-// 확률 계산
-function ps(w){return (WD[w]?WD[w].cs+1:1)/10;}
-function pn(w){return (WD[w]?WD[w].cn+1:1)/10;}
-
-function classify(words){
-  var s=prior, n=1-prior;
-  words.forEach(function(w){if(WD[w]){s*=ps(w);n*=pn(w);}});
-  var tot=s+n;
-  return tot>0?Math.round(s/tot*1000)/10:50;
-}
-
-// 단일 증거: 무료 유무만 사용
-function classifySingle(words){
-  var hasMuRyo = words.indexOf('무료')>=0;
-  // P(스팸|무료) = ps('무료')*prior / (ps('무료')*prior + pn('무료')*(1-prior))
-  if(hasMuRyo){
-    var s=prior*ps('무료'), n=(1-prior)*pn('무료'), tot=s+n;
-    return tot>0?Math.round(s/tot*1000)/10:50;
-  } else {
-    var ps2=1-ps('무료'), pn2=1-pn('무료');
-    var s=prior*ps2, n=(1-prior)*pn2, tot=s+n;
-    return tot>0?Math.round(s/tot*1000)/10:50;
+// ── 레이블링 ──────────────────────────────────────────────────────────────────
+function showLabelMember(mi){
+  curLabelMember=mi;
+  for(var i=0;i<3;i++){
+    document.getElementById('lp'+i).className='mpanel'+(i===mi?' show':'');
+    var t=document.getElementById('lt'+i);
+    t.style.cssText=i===mi?'background:'+MB[i]+';border-color:'+MC[i]+';color:'+MC[i]:'';
   }
 }
 
-function setPrior(p){
-  prior=p;
-  document.getElementById('priorNote').innerText='현재: P(스팸) = '+p+', P(정상) = '+(1-p).toFixed(1);
-  ['pr30','pr50','pr70'].forEach(function(id,i){
-    document.getElementById(id).className='prior-chip'+([0.3,0.5,0.7][i]===p?' sel':'');
+function setLabel(mi,eid,lbl){
+  var idx=EMAILS.findIndex(function(e){return e.id===eid;});
+  labels[mi][idx]=lbl;
+  // 버튼 색상 업데이트
+  ['spam','ham','unk'].forEach(function(k){
+    var btn=document.getElementById('lb'+mi+'_'+eid+'_'+k);
+    if(!btn) return;
+    btn.className='lbtn';
+    if(lbl==='스팸'&&k==='spam') btn.className='lbtn spam';
+    if(lbl==='정상'&&k==='ham')  btn.className='lbtn ham';
+    if(lbl==='모름'&&k==='unk')  btn.className='lbtn unk';
   });
-  if(curStep===3) renderTest();
-  if(curStep===4) renderContrast();
-  document.getElementById('priorDisplay').innerText='P(스팸)='+p;
+  // 카운터
+  var cnt=labels[mi].filter(function(l){return l!==null;}).length;
+  document.getElementById('lcnt'+mi).innerText=cnt;
 }
 
-// 초기 prior 버튼 상태 수정
-document.getElementById('pr30').className='prior-chip';
-document.getElementById('pr50').className='prior-chip sel';
+function gotoCompare(){
+  for(var i=0;i<3;i++){
+    var cnt=labels[i].filter(function(l){return l!==null;}).length;
+    if(cnt<5){alert(mnames[i]+'의 분류를 5개 이상 완료해 주세요.');showLabelMember(i);return;}
+  }
+  go(2);
+}
 
+// ── 의견 비교 ─────────────────────────────────────────────────────────────────
+function renderCompare(){
+  var h='<div class="card"><div style="overflow-x:auto"><table>';
+  h+='<thead><tr><th>이메일</th>';
+  for(var i=0;i<3;i++) h+='<th style="color:'+MC[i]+'">'+mnames[i]+'</th>';
+  h+='<th>공식 정답</th><th>의견 일치?</th></tr></thead><tbody>';
+  EMAILS.forEach(function(e,idx){
+    var lbls=labels.map(function(l){return l[idx]||'미분류';});
+    var validLbls=lbls.filter(function(l){return l==='스팸'||l==='정상';});
+    var allSame=validLbls.length>1&&validLbls.every(function(l){return l===validLbls[0];});
+    var hasConflict=!allSame&&validLbls.length>1;
+    var rowStyle=hasConflict?'background:rgba(234,179,8,.04)':'';
+    var star=hasConflict?'<span class="conflict-dot"></span>':'';
+    h+='<tr style="'+rowStyle+'">';
+    h+='<td><div style="font-size:11px;color:#666;margin-bottom:2px">'+e.id+'</div>';
+    h+=star+'<div style="font-size:12px;font-weight:600;color:#fff">'+e.subject+'</div></td>';
+    lbls.forEach(function(l,i){
+      var bc=l==='스팸'?'#ef4444':l==='정상'?'#22c55e':'#eab308';
+      var bg=l==='스팸'?'rgba(239,68,68,.12)':l==='정상'?'rgba(34,197,94,.1)':'rgba(234,179,8,.1)';
+      h+='<td style="text-align:center"><span style="padding:2px 8px;border-radius:5px;font-size:11px;font-weight:700;background:'+bg+';color:'+bc+'">'+l+'</span></td>';
+    });
+    var oc=e.official;
+    var ocb=oc==='스팸'?'#ef4444':'#22c55e';
+    var ocbg=oc==='스팸'?'rgba(239,68,68,.12)':'rgba(34,197,94,.1)';
+    h+='<td style="text-align:center"><span style="padding:2px 8px;border-radius:5px;font-size:11px;font-weight:700;background:'+ocbg+';color:'+ocb+'">'+oc+'</span></td>';
+    h+='<td style="text-align:center">'+(hasConflict?'<span style="color:#eab308;font-weight:700">★ 불일치</span>':'<span style="color:#22c55e">일치</span>')+'</td>';
+    h+='</tr>';
+  });
+  h+='</tbody></table></div></div>';
+  // 불일치 이메일 강조
+  var conflicts=EMAILS.filter(function(e,idx){
+    var lbls=labels.map(function(l){return l[idx]||'미분류';});
+    var v=lbls.filter(function(l){return l==='스팸'||l==='정상';});
+    return v.length>1&&!v.every(function(l){return l===v[0];});
+  });
+  if(conflicts.length){
+    h+='<div class="warn" style="margin-top:0">의견이 갈린 이메일 '+conflicts.length+'개: ';
+    h+=conflicts.map(function(e){return '<strong>'+e.id+'</strong>';
+    }).join(', ')+' — 왜 다르게 판단했는지 이야기해 보세요.</div>';
+  }
+  document.getElementById('compareTable').innerHTML=h;
+}
+
+// ── 키워드 선택 ───────────────────────────────────────────────────────────────
+function showKwMember(mi){
+  curKwMember=mi;
+  for(var i=0;i<3;i++){
+    document.getElementById('kp'+i).className='mpanel'+(i===mi?' show':'');
+    var t=document.getElementById('kt'+i);
+    t.style.cssText=i===mi?'background:'+MB[i]+';border-color:'+MC[i]+';color:'+MC[i]:'';
+  }
+  // 내 레이블 기반 스팸/정상 수 표시
+  updateKmInfo(mi);
+}
+
+function updateKmInfo(mi){
+  var mySpam=labels[mi].filter(function(l){return l==='스팸';}).length;
+  var myHam =labels[mi].filter(function(l){return l==='정상';}).length;
+  var el=document.getElementById('kminfo'+mi);
+  if(el) el.innerText='내 레이블: 스팸 '+mySpam+'개, 정상 '+myHam+'개';
+}
+
+function toggleKw(mi,wi){
+  var idx=selected[mi].indexOf(wi);
+  if(idx>=0){
+    selected[mi].splice(idx,1);
+    document.getElementById('wt'+mi+'_'+wi).className='wtoken';
+  }else{
+    var total=selected[mi].length+customSelected[mi].length;
+    if(total>=5){
+      var c=document.getElementById('kwcnt'+mi);
+      c.innerText='최대!'; c.style.color='#ef4444';
+      setTimeout(function(){updateKwCount(mi);},1000);
+      return;
+    }
+    selected[mi].push(wi);
+    document.getElementById('wt'+mi+'_'+wi).className='wtoken sel-'+mi;
+  }
+  updateKwCount(mi);
+  renderSelPrev(mi);
+}
+
+function renderSelPrev(mi){
+  var el=document.getElementById('selPrev'+mi);
+  var allW=getAllSelectedWords(mi);
+  if(!allW.length){el.innerHTML='<span class="empty-hint">아래 단어를 클릭하여 선택하세요.</span>';return;}
+  el.innerHTML=allW.map(function(w){
+    return '<span class="sel-tag" style="background:'+MB[mi]+';border:1px solid '+MC[mi]+';color:'+MC[mi]+'">'+w+'</span>';
+  }).join('');
+}
+
+function gotoReveal(){
+  for(var i=0;i<3;i++){
+    if(!selected[i].length&&!customSelected[i].length){
+      alert(mnames[i]+'의 키워드를 선택해 주세요.');showKwMember(i);return;
+    }
+  }
+  go(4);
+}
+
+// ── 확률 계산 (내 레이블 기준) ────────────────────────────────────────────────
+function getMyProbs(mi){
+  var mySpamEmails=[],myHamEmails=[];
+  EMAILS.forEach(function(e,idx){
+    var lbl=labels[mi][idx];
+    if(lbl==='스팸') mySpamEmails.push(e);
+    else if(lbl==='정상') myHamEmails.push(e);
+  });
+  var nS=mySpamEmails.length||1, nH=myHamEmails.length||1;
+  var allW=getAllSelectedWords(mi);
+  var V=allW.length||1;
+  var probs={};
+  allW.forEach(function(w){
+    var sc=mySpamEmails.filter(function(e){return (e.subject+' '+e.body).indexOf(w)>=0;}).length;
+    var nc=myHamEmails.filter(function(e){return (e.subject+' '+e.body).indexOf(w)>=0;}).length;
+    probs[w]={sc:sc,nc:nc,ps:(sc+1)/(nS+V),pn:(nc+1)/(nH+V)};
+  });
+  return {probs:probs,nS:nS,nH:nH,V:V,priorS:nS/(nS+nH),priorH:nH/(nS+nH)};
+}
+
+function getOfficialProbs(mi){
+  var oSpam=EMAILS.filter(function(e){return e.official==='스팸';});
+  var oHam =EMAILS.filter(function(e){return e.official==='정상';});
+  var nS=oSpam.length, nH=oHam.length;
+  var allW=getAllSelectedWords(mi);
+  var V=allW.length||1;
+  var probs={};
+  allW.forEach(function(w){
+    var sc=oSpam.filter(function(e){return (e.subject+' '+e.body).indexOf(w)>=0;}).length;
+    var nc=oHam.filter(function(e){ return (e.subject+' '+e.body).indexOf(w)>=0;}).length;
+    probs[w]={sc:sc,nc:nc,ps:(sc+1)/(nS+V),pn:(nc+1)/(nH+V)};
+  });
+  return {probs:probs,nS:nS,nH:nH,V:V,priorS:0.5,priorH:0.5};
+}
+
+function classify(mi,emailWords,useOfficial){
+  var info=useOfficial?getOfficialProbs(mi):getMyProbs(mi);
+  var selW=getAllSelectedWords(mi);
+  var hit=emailWords.filter(function(w){return selW.indexOf(w)>=0;});
+  if(!hit.length) return 50.0;
+  var s=info.priorS, n=info.priorH;
+  hit.forEach(function(w){
+    if(info.probs[w]){s*=info.probs[w].ps; n*=info.probs[w].pn;}
+  });
+  var tot=s+n;
+  return tot>0?Math.round(s/tot*1000)/10:50.0;
+}
+
+// ── 정답 공개 ─────────────────────────────────────────────────────────────────
+function renderReveal(mi){
+  curRevealMember=mi;
+  var th='';
+  for(var i=0;i<3;i++){
+    var s=i===mi?'background:'+MB[i]+';border-color:'+MC[i]+';color:'+MC[i]:'';
+    th+='<button class="mtab" style="'+s+'" onclick="renderReveal('+i+')">'+mnames[i]+'</button>';
+  }
+
+  var myInfo=getMyProbs(mi), ofInfo=getOfficialProbs(mi);
+  var selW=getAllSelectedWords(mi);
+
+  var h='<div class="mtabs">'+th+'</div>';
+
+  // 레이블 비교 요약
+  var mySpamCnt=labels[mi].filter(function(l){return l==='스팸';}).length;
+  var myHamCnt =labels[mi].filter(function(l){return l==='정상';}).length;
+  var diffCnt=EMAILS.filter(function(e,idx){
+    var ml=labels[mi][idx];
+    return ml&&ml!=='모름'&&ml!==e.official;
+  }).length;
+
+  h+='<div class="card" style="border-color:'+MC[mi]+'44">';
+  h+='<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">';
+  h+='<div style="width:34px;height:34px;border-radius:8px;background:'+MB[mi]+';display:flex;align-items:center;justify-content:center;font-size:17px">'+ICONS[mi]+'</div>';
+  h+='<div><div style="font-weight:700;color:'+MC[mi]+'">'+mnames[mi]+' — 레이블 비교</div>';
+  h+='<div style="font-size:11px;color:#94a3b8">내 레이블: 스팸 '+mySpamCnt+'개 / 정상 '+myHamCnt+'개 &nbsp;|&nbsp; 공식과 다른 것: '+diffCnt+'개</div></div></div>';
+
+  // 불일치 이메일 표시
+  var diffs=EMAILS.filter(function(e,idx){
+    var ml=labels[mi][idx];
+    return ml&&ml!=='모름'&&ml!==e.official;
+  });
+  if(diffs.length){
+    h+='<div style="margin-bottom:14px"><div style="font-size:12px;font-weight:700;color:#eab308;margin-bottom:6px">⚠ 공식 레이블과 다르게 분류한 이메일</div>';
+    diffs.forEach(function(e,di){
+      var mi_lbl=labels[mi][EMAILS.indexOf(e)];
+      h+='<div style="padding:8px 12px;background:#1e1e2e;border-radius:7px;margin-bottom:5px;border-left:3px solid #eab308;font-size:12px">';
+      h+='<strong style="color:#fff">'+e.id+'</strong> &ldquo;'+e.subject+'&rdquo;<br>';
+      h+='내 판단: <span style="color:'+(mi_lbl==='스팸'?'#ef4444':'#22c55e')+'">'+mi_lbl+'</span>';
+      h+=' &nbsp;→&nbsp; 공식: <span style="color:'+(e.official==='스팸'?'#ef4444':'#22c55e')+'">'+e.official+'</span>';
+      h+='</div>';
+    });
+    h+='</div>';
+  }
+
+  // 확률 비교표 (내 레이블 vs 공식 레이블)
+  h+='<div style="font-size:12px;font-weight:700;color:#fff;margin-bottom:8px">선택 키워드 확률 비교</div>';
+  h+='<div style="overflow-x:auto"><table><thead><tr>';
+  h+='<th>단어</th>';
+  h+='<th style="color:#f97316">내 레이블<br>P(단어|스팸)</th>';
+  h+='<th style="color:#f97316">내 레이블<br>P(단어|정상)</th>';
+  h+='<th style="color:#60a5fa">공식 레이블<br>P(단어|스팸)</th>';
+  h+='<th style="color:#60a5fa">공식 레이블<br>P(단어|정상)</th>';
+  h+='<th>확률 차이?</th>';
+  h+='</tr></thead><tbody>';
+
+  selW.forEach(function(w){
+    var mp=myInfo.probs[w], op=ofInfo.probs[w];
+    if(!mp||!op) return;
+    var diffPs=Math.abs(mp.ps-op.ps)>0.03, diffPn=Math.abs(mp.pn-op.pn)>0.03;
+    var hasDiff=diffPs||diffPn;
+    h+='<tr style="'+(hasDiff?'background:rgba(234,179,8,.04)':'')+'">';
+    var isCustomW=customSelected[mi].indexOf(w)>=0;
+    h+='<td style="font-weight:700;color:#fff">'+w+(isCustomW?'<span style="padding:1px 6px;border-radius:4px;font-size:10px;font-weight:700;background:rgba(234,179,8,.15);color:#eab308;margin-left:5px">기타</span>':'')+(hasDiff?'<span style="color:#eab308;font-size:10px;margin-left:5px">차이!</span>':'')+'</td>';
+    h+='<td><span class="pv" style="color:#f97316">'+mp.ps.toFixed(3)+'</span> <span style="font-size:10px;color:#555">('+mp.sc+'/'+myInfo.nS+')</span></td>';
+    h+='<td><span class="pv" style="color:#f97316">'+mp.pn.toFixed(3)+'</span> <span style="font-size:10px;color:#555">('+mp.nc+'/'+myInfo.nH+')</span></td>';
+    h+='<td><span class="pv" style="color:#60a5fa">'+op.ps.toFixed(3)+'</span> <span style="font-size:10px;color:#555">('+op.sc+'/'+ofInfo.nS+')</span></td>';
+    h+='<td><span class="pv" style="color:#60a5fa">'+op.pn.toFixed(3)+'</span> <span style="font-size:10px;color:#555">('+op.nc+'/'+ofInfo.nH+')</span></td>';
+    h+='<td>'+(hasDiff?'<span style="color:#eab308;font-weight:700">다름</span>':'<span style="color:#475569">같음</span>')+'</td>';
+    h+='</tr>';
+  });
+  h+='</tbody></table></div></div>';
+  document.getElementById('revealContent').innerHTML=h;
+}
+
+// ── 테스트 ────────────────────────────────────────────────────────────────────
 function renderTest(){
-  unk(3); unk(4);
-  var tbody='', ok1=0, ok2=0;
+  var ks='<div style="display:flex;gap:8px;flex-wrap:wrap">';
+  for(var i=0;i<3;i++){
+    var ws=getAllSelectedWords(i);
+    ks+='<div style="flex:1;min-width:140px;padding:10px;border-radius:8px;background:#1e1e2e;border:1px solid '+MC[i]+'44">';
+    ks+='<div style="font-size:11px;font-weight:700;color:'+MC[i]+';margin-bottom:6px">'+mnames[i]+'</div>';
+    ks+=ws.map(function(w){return '<span class="wtag">'+w+'</span>';}).join('');
+    ks+='</div>';
+  }
+  document.getElementById('kwSummary').innerHTML=ks+'</div>';
+  for(var i=0;i<3;i++) document.getElementById('th'+i).innerText=mnames[i]+' 판정';
+
+  var ok=[0,0,0];
+  var tbody='';
   TEST.forEach(function(e){
-    var p1=classifySingle(e.words);
-    var p2=classify(e.words);
-    var j1=p1>=50?'스팸':'정상';
-    var j2=p2>=50?'스팸':'정상';
     var isSpam=e.label==='스팸';
-    var c1=j1===e.label; if(c1)ok1++;
-    var c2=j2===e.label; if(c2)ok2++;
-    var badge=isSpam?'<span class="badge badge-spam">스팸</span>':'<span class="badge badge-ham">정상</span>';
-    var wtags=e.words.map(function(w){return '<span class="word-tag">'+w+'</span>';}).join('');
-    var hasMr=e.words.indexOf('무료')>=0;
-    var p1str=(hasMr?'무료 있음':'무료 없음')+'<br><span style="font-family:monospace;font-weight:700;color:#f97316">'+p1.toFixed(1)+'%</span>';
-    var tick1=c1?'<span style="color:#22c55e">✓</span>':'<span style="color:#ef4444">✗</span>';
-    var tick2=c2?'<span style="color:#22c55e">✓</span>':'<span style="color:#ef4444">✗</span>';
-    var diff=c1!==c2?' style="background:rgba(234,179,8,.06)"':'';
-    var j1color=j1==='스팸'?'#ef4444':'#22c55e';
-    var j2color=j2==='스팸'?'#ef4444':'#22c55e';
-    tbody+='<tr'+diff+'>';
+    var badge=isSpam?'<span class="badge bs">스팸</span>':'<span class="badge bh">정상</span>';
+    var results=[];
+    for(var i=0;i<3;i++){
+      var selW=selected[i].map(function(wi){return WORDS[wi];});
+      var hit=e.words.filter(function(w){return selW.indexOf(w)>=0;});
+      var pct=classify(i,e.words,false); // 내 레이블 기준
+      var judge=pct>=50?'스팸':'정상';
+      var correct=judge===e.label;
+      if(correct) ok[i]++;
+      results.push({hit:hit,pct:pct,judge:judge,correct:correct});
+    }
+    var allSame=results[0].judge===results[1].judge&&results[1].judge===results[2].judge;
+    var star=allSame?'':' <span style="color:#eab308;font-size:11px">★</span>';
+    tbody+='<tr style="'+(allSame?'':'background:rgba(234,179,8,.04)')+'">';
     tbody+='<td style="font-size:11px;color:#666">'+e.id+'</td>';
-    tbody+='<td>'+e.text+'</td>';
+    tbody+='<td>'+e.text+star+'</td>';
     tbody+='<td>'+badge+'</td>';
-    tbody+='<td>'+(wtags||'<span style="color:#444;font-size:11px">—</span>')+'</td>';
-    tbody+='<td style="font-size:12px;color:#94a3b8;text-align:center">'+p1str+'</td>';
-    tbody+='<td style="text-align:center"><span style="font-weight:700;color:'+j1color+'">'+j1+'</span> '+tick1+'</td>';
-    tbody+='<td style="text-align:center;font-family:monospace;font-weight:700;color:#3b82f6">'+p2.toFixed(1)+'%</td>';
-    tbody+='<td style="text-align:center"><span style="font-weight:700;color:'+j2color+'">'+j2+'</span> '+tick2+'</td>';
+    tbody+='<td>'+e.words.map(function(w){return '<span class="wtag">'+w+'</span>';}).join('')+'</td>';
+    results.forEach(function(r,i){
+      var jc=r.judge==='스팸'?'#ef4444':'#22c55e';
+      var tc=r.correct?'#22c55e':'#ef4444';
+      var hitStr=r.hit.length?'<div style="font-size:10px;color:'+MC[i]+'">'+r.hit.join(',')+'</div>':'<div style="font-size:10px;color:#333">해당없음</div>';
+      tbody+='<td style="text-align:center"><span style="font-weight:700;color:'+jc+'">'+r.judge+'</span> <span style="color:'+tc+'">'+(r.correct?'✓':'✗')+'</span>';
+      tbody+='<div style="font-size:10px;color:#555;font-family:monospace">'+r.pct.toFixed(1)+'%</div>'+hitStr+'</td>';
+    });
     tbody+='</tr>';
   });
-  document.getElementById('testTableBody').innerHTML=tbody;
-  document.getElementById('acc1').innerText=ok1+'/'+TEST.length;
-  document.getElementById('acc2').innerText=ok2+'/'+TEST.length;
+  document.getElementById('testBody').innerHTML=tbody;
+
+  var sorted=[0,1,2].slice().sort(function(a,b){return ok[b]-ok[a];});
+  var rankEmoji=['🥇','🥈','🥉'];
+  var ag='';
+  for(var i=0;i<3;i++){
+    var rank=rankEmoji[sorted.indexOf(i)];
+    var ws=getAllSelectedWords(i);
+    var myS=labels[i].filter(function(l){return l==='스팸';}).length;
+    var myH=labels[i].filter(function(l){return l==='정상';}).length;
+    var diffCnt2=EMAILS.filter(function(e,idx){
+      var ml=labels[i][idx]; return ml&&ml!=='모름'&&ml!==e.official;
+    }).length;
+    ag+='<div class="acc-card" style="border-color:'+MC[i]+'55;background:'+MB[i]+'">';
+    ag+='<div style="font-size:20px;margin-bottom:4px">'+rank+'</div>';
+    ag+='<div style="font-size:11px;color:'+MC[i]+';margin-bottom:4px">'+mnames[i]+'</div>';
+    ag+='<div style="font-size:26px;font-weight:900;color:'+MC[i]+'">'+ok[i]+'/'+TEST.length+'</div>';
+    ag+='<div style="font-size:11px;color:#555;margin-bottom:6px">내 레이블: 스팸'+myS+'/정상'+myH+' | 공식과 차이 '+diffCnt2+'개</div>';
+    ag+='<div>'+ws.map(function(w){return '<span class="wtag">'+w+'</span>';}).join('')+'</div>';
+    ag+='</div>';
+  }
+  document.getElementById('accGrid').innerHTML=ag;
 }
 
-function renderContrast(){
-  var h='';
-  var found=false;
+// ── 비교 분석 ─────────────────────────────────────────────────────────────────
+function renderAnalysis(){
+  var ok=[0,0,0];
   TEST.forEach(function(e){
-    var p1=classifySingle(e.words);
-    var p2=classify(e.words);
-    var j1=p1>=50?'스팸':'정상';
-    var j2=p2>=50?'스팸':'정상';
-    if(j1!==j2){
-      found=true;
-      var isSpam=e.label==='스팸';
-      var hasMr=e.words.indexOf('무료')>=0;
-      var j1ok=j1===e.label, j2ok=j2===e.label;
-      h+='<div style="padding:12px;background:#1e1e2e;border-radius:8px;margin-bottom:10px;border-left:3px solid #eab308">';
-      h+='<div style="font-weight:700;color:#fff;margin-bottom:6px">'+e.id+' &ldquo;'+e.text+'&rdquo;</div>';
-      h+='<div style="font-size:13px;color:#94a3b8;margin-bottom:8px">실제 정답: <strong style="color:'+(isSpam?'#ef4444':'#22c55e')+'">'+e.label+'</strong> &nbsp;|&nbsp; 포함 단어: '+e.words.join(', ')+'</div>';
-      h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
-      h+='<div style="padding:9px;border-radius:7px;background:'+(j1ok?'rgba(34,197,94,.1)':'rgba(239,68,68,.1)')+';border:1px solid '+(j1ok?'#22c55e':'#ef4444')+'">';
-      h+='<div style="font-size:10px;color:#f97316;margin-bottom:3px">단일 증거 ('+(hasMr?'무료 있음':'무료 없음')+')</div>';
-      h+='<div style="font-weight:700;font-size:15px;color:#f97316">'+p1.toFixed(1)+'% → '+j1+' '+(j1ok?'✓':'✗')+'</div>';
-      h+='<div style="font-size:11px;color:#666;margin-top:3px">'+(j1ok?'정답':'오답: 무료 유무만으로 판단')+'</div></div>';
-      h+='<div style="padding:9px;border-radius:7px;background:'+(j2ok?'rgba(34,197,94,.1)':'rgba(239,68,68,.1)')+';border:1px solid '+(j2ok?'#22c55e':'#ef4444')+'">';
-      h+='<div style="font-size:10px;color:#3b82f6;margin-bottom:3px">복합 증거 ('+e.words.join('+')+')</div>';
-      h+='<div style="font-weight:700;font-size:15px;color:#3b82f6">'+p2.toFixed(1)+'% → '+j2+' '+(j2ok?'✓':'✗')+'</div>';
-      h+='<div style="font-size:11px;color:#666;margin-top:3px">'+(j2ok?'정답: 여러 단어 신호 종합':'오답')+'</div></div>';
-      h+='</div></div>';
+    for(var i=0;i<3;i++){
+      if((classify(i,e.words,false)>=50)===(e.label==='스팸')) ok[i]++;
     }
   });
-  if(!found) h='<div style="color:#94a3b8">두 방법의 결과가 모두 일치합니다.</div>';
-  document.getElementById('contrastOut').innerHTML=h;
+
+  var h='';
+
+  // 레이블링 차이 요약
+  h+='<div class="card"><div style="font-weight:700;color:#fff;margin-bottom:14px">🏷️ 레이블링 차이가 성능에 미친 영향</div>';
+  h+='<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">';
+  for(var i=0;i<3;i++){
+    var diffCnt=EMAILS.filter(function(e,idx){
+      var ml=labels[i][idx]; return ml&&ml!=='모름'&&ml!==e.official;
+    }).length;
+    var pct=(ok[i]/TEST.length*100).toFixed(0);
+    h+='<div style="padding:12px;border-radius:9px;background:#1e1e2e;border:1px solid '+MC[i]+'44">';
+    h+='<div style="font-weight:700;color:'+MC[i]+';margin-bottom:8px">'+mnames[i]+' — '+ok[i]+'/'+TEST.length+' ('+pct+'%)</div>';
+    h+='<div style="font-size:12px;color:#94a3b8;margin-bottom:4px">공식과 다른 레이블: <strong style="color:'+(diffCnt>0?'#eab308':'#22c55e')+'">'+diffCnt+'개</strong></div>';
+    var myS=labels[i].filter(function(l){return l==='스팸';}).length;
+    var myH=labels[i].filter(function(l){return l==='정상';}).length;
+    h+='<div style="font-size:12px;color:#94a3b8">내 레이블: 스팸 '+myS+'개 / 정상 '+myH+'개</div>';
+    h+='</div>';
+  }
+  h+='</div></div>';
+
+  // 핵심 메시지
+  h+='<div class="card">';
+  h+='<div style="font-weight:700;color:#fff;margin-bottom:12px">💡 핵심 발견</div>';
+  h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:13px">';
+  h+='<div style="padding:12px;background:#1e1e2e;border-radius:8px;border-left:3px solid #ef4444">';
+  h+='<div style="font-weight:700;color:#ef4444;margin-bottom:6px">레이블이 달라지면</div>';
+  h+='<div style="color:#94a3b8;line-height:1.7">같은 단어도 P(단어|스팸)이 달라집니다.<br>나이브 베이즈 공식은 동일하지만<br>입력되는 확률이 달라져 결과가 바뀝니다.</div>';
+  h+='</div>';
+  h+='<div style="padding:12px;background:#1e1e2e;border-radius:8px;border-left:3px solid #22c55e">';
+  h+='<div style="font-weight:700;color:#22c55e;margin-bottom:6px">알고리즘보다 데이터가 중요</div>';
+  h+='<div style="color:#94a3b8;line-height:1.7">AI의 성능은 알고리즘보다<br>학습 데이터의 레이블 품질에<br>더 크게 영향을 받습니다.</div>';
+  h+='</div>';
+  h+='</div>';
+  h+='<div style="margin-top:12px;padding:10px 12px;background:#1e1e2e;border-radius:8px;font-size:13px;color:#94a3b8;line-height:1.75">';
+  h+='<strong style="color:#fff">실제 AI는 어떻게 해결하나요?</strong><br>';
+  h+='Gmail은 수억 명의 사용자가 "스팸 신고" 버튼을 누른 데이터를 사용합니다.<br>';
+  h+='다수결로 레이블을 정하면 개인 편향이 줄어들지만, 여전히 완벽하지 않습니다.<br>';
+  h+='이것이 <strong style="color:#fff">데이터 편향(Data Bias)</strong> 문제입니다.';
+  h+='</div></div>';
+
+  document.getElementById('analysisOut').innerHTML=h;
 }
 
+// ── 리셋 ──────────────────────────────────────────────────────────────────────
 function resetAll(){
-  prior=0.5;
-  document.getElementById('pr30').className='prior-chip';
-  document.getElementById('pr50').className='prior-chip sel';
-  document.getElementById('pr70').className='prior-chip';
-  document.getElementById('priorNote').innerText='현재: P(스팸) = 0.5, P(정상) = 0.5';
-  unlocked={0:true,1:true,2:true}; curStep=0;
-  document.getElementById('testTableBody').innerHTML='';
-  document.getElementById('acc1').innerText='—';
-  document.getElementById('acc2').innerText='—';
-  document.getElementById('contrastOut').innerHTML='테스트를 먼저 실행하세요.';
+  labels=[[],[],[]];
+  EMAILS.forEach(function(e){
+    for(var i=0;i<3;i++) labels[i].push(null);
+  });
+  selected=[[],[],[]];
+  for(var mi=0;mi<3;mi++){
+    document.getElementById('lcnt'+mi).innerText='0';
+    document.getElementById('kwcnt'+mi).innerText='0';
+    EMAILS.forEach(function(e){
+      ['spam','ham','unk'].forEach(function(k){
+        var btn=document.getElementById('lb'+mi+'_'+e.id+'_'+k);
+        if(btn) btn.className='lbtn';
+      });
+    });
+    for(var wi=0;wi<WORDS.length;wi++){
+      var el=document.getElementById('wt'+mi+'_'+wi);
+      if(el) el.className='wtoken';
+    }
+    var sp=document.getElementById('selPrev'+mi);
+    if(sp) sp.innerHTML='<span class="empty-hint">아래 단어를 클릭하여 선택하세요.</span>';
+  }
+  customWords=[[],[],[]];
+  customSelected=[[],[],[]];
+  for(var mi=0;mi<3;mi++){
+    var cw=document.getElementById('cwcloud'+mi);
+    if(cw) cw.innerHTML='';
+    var ci=document.getElementById('custom'+mi);
+    if(ci) ci.value='';
+  }
+  curLabelMember=0; curKwMember=0; curRevealMember=0;
   go(0);
 }
 </script>
