@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>나이브 베이즈 스팸 필터 실습</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0d0d14;color:#e8e8f0;font-family:system-ui,sans-serif;font-size:14px}
+.wrap{max-width:900px;margin:0 auto;padding:20px 14px 60px}
+h2{font-size:18px;font-weight:700;margin-bottom:10px;color:#fff}
+.sub{color:#94a3b8;font-size:13px;margin-bottom:18px;line-height:1.6}
+.card{background:#16161f;border:1px solid #2a2a3e;border-radius:11px;padding:16px;margin-bottom:12px}
+.info{border-left:3px solid #3b82f6;background:#0f1520;padding:10px 14px;border-radius:0 8px 8px 0;font-size:13px;color:#94a3b8;line-height:1.7;margin-bottom:14px}
+.warn{border-left:3px solid #f97316;background:rgba(249,115,22,.07);padding:10px 14px;border-radius:0 8px 8px 0;font-size:13px;color:#fb923c;line-height:1.7;margin-bottom:14px}
+.step{display:none}.step.on{display:block}
+.nav-row{display:flex;gap:6px;margin-bottom:20px;flex-wrap:wrap}
+.nbtn{padding:8px 16px;border-radius:7px;border:none;font-size:12px;font-weight:700;cursor:pointer;background:#1e1e2e;color:#555}
+.nbtn.on{background:rgba(229,9,20,.15);color:#ff4d57;border:1px solid #ff4d57}
+.nbtn.done{color:#94a3b8}
+.nbtn.locked{opacity:.3;cursor:not-allowed}
+.btn{padding:9px 20px;border-radius:8px;border:none;font-size:13px;font-weight:700;cursor:pointer}
+.br{background:#e50914;color:#fff}
+.bb{background:#3b82f6;color:#fff}
+.bg{background:#1e1e2e;color:#94a3b8;border:1px solid #3a3a55}
+.brow{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap}
+label{font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:#666;display:block;margin-bottom:4px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{background:#1e1e2e;padding:8px 12px;text-align:left;font-size:10px;color:#475569;border-bottom:1px solid #2a2a3e;white-space:nowrap;letter-spacing:1px;text-transform:uppercase}
+td{padding:8px 12px;border-bottom:1px solid #1e1e2e;vertical-align:middle}
+.spam-row td{background:rgba(239,68,68,.04)}
+.ham-row td{background:rgba(34,197,94,.04)}
+.badge{display:inline-block;padding:2px 8px;border-radius:5px;font-size:11px;font-weight:700}
+.badge-spam{background:rgba(239,68,68,.15);color:#ef4444}
+.badge-ham{background:rgba(34,197,94,.12);color:#22c55e}
+.word-tag{display:inline-block;padding:2px 7px;border-radius:4px;font-size:11px;font-weight:600;margin:1px;background:#1e1e2e;border:1px solid #3a3a55;color:#94a3b8}
+.bar{width:60px;height:5px;background:#2a2a3e;border-radius:2px;overflow:hidden;display:inline-block;vertical-align:middle;margin-right:6px}
+.bf{height:100%;border-radius:2px}
+.prob-val{font-family:monospace;font-size:12px}
+.srow{display:flex;align-items:center;gap:7px;margin-bottom:7px}
+.strk{flex:1;height:6px;background:#2a2a3e;border-radius:3px;overflow:hidden}
+.sfil{height:100%;border-radius:3px;transition:width .5s}
+.spct{font-size:11px;color:#94a3b8;min-width:36px;text-align:right;font-family:monospace}
+.res-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px;margin:14px 0}
+.rcard{background:#16161f;border:1px solid #2a2a3e;border-radius:11px;padding:14px}
+.winner{margin-top:10px;padding:8px 12px;border-radius:7px;font-weight:700;text-align:center;font-size:14px}
+.prior-row{display:flex;gap:8px;margin-bottom:6px;align-items:center;flex-wrap:wrap}
+.prior-chip{padding:5px 12px;border-radius:7px;border:1px solid #3a3a55;background:transparent;cursor:pointer;font-size:13px;font-weight:600;color:#94a3b8}
+.prior-chip.sel{background:rgba(59,130,246,.15);border-color:#3b82f6;color:#60a5fa}
+.dq{padding:11px 13px;background:#1e1e2e;border-radius:8px;margin-bottom:7px;font-size:13px;line-height:1.6}
+.qn{font-size:10px;font-family:monospace;margin-bottom:4px}
+@media(max-width:560px){table{font-size:12px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<div class="nav-row" id="nav"></div>
+
+<!-- 0: 소개 -->
+<div class="step on" id="s0">
+  <div style="text-align:center;padding:28px 0 16px">
+    <div style="display:inline-block;padding:3px 12px;border:1px solid #e50914;border-radius:20px;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:#ff4d57;margin-bottom:14px">AI 수업 실습</div>
+    <h1 style="font-size:30px;font-weight:900;margin-bottom:12px;line-height:1.3">나이브 베이즈로<br>스팸 필터 만들기</h1>
+    <p class="sub" style="max-width:480px;margin:0 auto 20px">학습 데이터로 단어별 확률을 계산하고, 새 이메일이 스팸인지 정상인지 직접 판정해 봅니다.<br>단일 증거(단어 1개)와 복합 증거(여러 단어)의 차이도 비교합니다.</p>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;max-width:520px;margin:0 auto 20px">
+      <div class="card" style="text-align:center"><div style="font-size:20px;margin-bottom:5px">📚</div><div style="font-size:11px;font-weight:700;color:#60a5fa">학습 데이터</div><div style="font-size:11px;color:#94a3b8;margin-top:3px">이메일 10개</div></div>
+      <div class="card" style="text-align:center"><div style="font-size:20px;margin-bottom:5px">🧮</div><div style="font-size:11px;font-weight:700;color:#f97316">확률 계산</div><div style="font-size:11px;color:#94a3b8;margin-top:3px">단어 5개</div></div>
+      <div class="card" style="text-align:center"><div style="font-size:20px;margin-bottom:5px">🧪</div><div style="font-size:11px;font-weight:700;color:#a855f7">테스트</div><div style="font-size:11px;color:#94a3b8;margin-top:3px">이메일 6개</div></div>
+      <div class="card" style="text-align:center"><div style="font-size:20px;margin-bottom:5px">📊</div><div style="font-size:11px;font-weight:700;color:#22c55e">비교 분석</div><div style="font-size:11px;color:#94a3b8;margin-top:3px">단일 vs 복합</div></div>
+    </div>
+    <button class="btn br" onclick="go(1)">시작하기 →</button>
+  </div>
+</div>
+
+<!-- 1: 학습 데이터 -->
+<div class="step" id="s1">
+  <h2>학습 데이터셋</h2>
+  <div class="sub">아래 이메일 10개(스팸 5개, 정상 5개)로 스팸 필터를 학습합니다. 어떤 단어가 스팸 신호인지 살펴보세요.</div>
+  <div class="card">
+    <div style="overflow-x:auto"><table>
+      <thead><tr><th>#</th><th>이메일 제목</th><th>분류</th><th>포함 단어</th></tr></thead>
+      <tbody><tr class="spam-row"><td style="color:#666;font-size:12px">1</td><td>★무료★ 상품권 10만원 즉시 지급! 지금 클릭!</td><td><span class="badge badge-spam">스팸</span></td><td><span class="word-tag">무료</span><span class="word-tag">클릭</span></td></tr>
+<tr class="spam-row"><td style="color:#666;font-size:12px">2</td><td>이벤트 당첨! 지금 바로 수령하세요</td><td><span class="badge badge-spam">스팸</span></td><td><span class="word-tag">이벤트</span></td></tr>
+<tr class="spam-row"><td style="color:#666;font-size:12px">3</td><td>대출 이자 0%! 지금 신청하면 무료!</td><td><span class="badge badge-spam">스팸</span></td><td><span class="word-tag">신청</span><span class="word-tag">무료</span></td></tr>
+<tr class="spam-row"><td style="color:#666;font-size:12px">4</td><td>클릭 한 번으로 100만원 당첨 기회!</td><td><span class="badge badge-spam">스팸</span></td><td><span class="word-tag">클릭</span></td></tr>
+<tr class="spam-row"><td style="color:#666;font-size:12px">5</td><td>이벤트 참여하고 아이폰 받아가세요!</td><td><span class="badge badge-spam">스팸</span></td><td><span class="word-tag">이벤트</span></td></tr>
+<tr class="ham-row"><td style="color:#666;font-size:12px">6</td><td>[공지] 내일 수학 수행평가 범위 안내</td><td><span class="badge badge-ham">정상</span></td><td><span class="word-tag">안내</span></td></tr>
+<tr class="ham-row"><td style="color:#666;font-size:12px">7</td><td>Re: 모둠 발표 자료 공유합니다</td><td><span class="badge badge-ham">정상</span></td><td><span style="color:#444;font-size:11px">—</span></td></tr>
+<tr class="ham-row"><td style="color:#666;font-size:12px">8</td><td>[안내] 도서관 반납 기한 연장 신청</td><td><span class="badge badge-ham">정상</span></td><td><span class="word-tag">안내</span><span class="word-tag">신청</span></td></tr>
+<tr class="ham-row"><td style="color:#666;font-size:12px">9</td><td>이번 주 급식 메뉴 변경 안내</td><td><span class="badge badge-ham">정상</span></td><td><span class="word-tag">안내</span></td></tr>
+<tr class="ham-row"><td style="color:#666;font-size:12px">10</td><td>방과후 프로그램 신청 마감 안내</td><td><span class="badge badge-ham">정상</span></td><td><span class="word-tag">신청</span><span class="word-tag">안내</span></td></tr>
+      </tbody>
+    </table></div>
+  </div>
+  <div class="info">학습 단어 5개: <strong style="color:#60a5fa">무료 / 이벤트 / 신청 / 클릭 / 안내</strong> &nbsp;|&nbsp; 스팸 5개, 정상 5개, V=5</div>
+  <div class="brow">
+    <button class="btn br" onclick="go(2)">확률 계산하기 →</button>
+  </div>
+</div>
+
+<!-- 2: 확률 계산 -->
+<div class="step" id="s2">
+  <h2>나이브 베이즈 확률표</h2>
+  <div class="sub">학습 데이터에서 단어별 조건부 확률을 계산합니다. (라플라스 스무딩 적용)</div>
+  <div class="info"><strong style="color:#60a5fa">공식</strong> P(단어|클래스) = (등장 횟수 + 1) ÷ (해당 클래스 이메일 수 + V)<br>
+  각 클래스 이메일 수 = 5, V = 5 → 분모 = 10</div>
+  <div class="card">
+    <div style="overflow-x:auto"><table>
+      <thead><tr>
+        <th>단어</th>
+        <th>스팸 중 등장</th><th>P(단어|스팸)</th>
+        <th>정상 중 등장</th><th>P(단어|정상)</th>
+        <th>스팸/정상 비율</th>
+      </tr></thead>
+      <tbody><tr>
+        <td style="font-weight:700;color:#fff">무료</td>
+        <td style="text-align:center">2</td>
+        <td><div class="bar"><div class="bf" style="width:30%;background:#ef4444"></div></div><span class="prob-val" style="color:#ef4444">0.300</span><span style="font-size:10px;color:#555"> (2+1)/10</span></td>
+        <td style="text-align:center">0</td>
+        <td><div class="bar"><div class="bf" style="width:10%;background:#22c55e"></div></div><span class="prob-val" style="color:#22c55e">0.100</span><span style="font-size:10px;color:#555"> (0+1)/10</span></td>
+        <td style="font-weight:700;color:#ef4444">3.0배 ↑스팸</td>
+      </tr>
+<tr>
+        <td style="font-weight:700;color:#fff">이벤트</td>
+        <td style="text-align:center">2</td>
+        <td><div class="bar"><div class="bf" style="width:30%;background:#ef4444"></div></div><span class="prob-val" style="color:#ef4444">0.300</span><span style="font-size:10px;color:#555"> (2+1)/10</span></td>
+        <td style="text-align:center">0</td>
+        <td><div class="bar"><div class="bf" style="width:10%;background:#22c55e"></div></div><span class="prob-val" style="color:#22c55e">0.100</span><span style="font-size:10px;color:#555"> (0+1)/10</span></td>
+        <td style="font-weight:700;color:#ef4444">3.0배 ↑스팸</td>
+      </tr>
+<tr>
+        <td style="font-weight:700;color:#fff">신청</td>
+        <td style="text-align:center">1</td>
+        <td><div class="bar"><div class="bf" style="width:20%;background:#ef4444"></div></div><span class="prob-val" style="color:#ef4444">0.200</span><span style="font-size:10px;color:#555"> (1+1)/10</span></td>
+        <td style="text-align:center">2</td>
+        <td><div class="bar"><div class="bf" style="width:30%;background:#22c55e"></div></div><span class="prob-val" style="color:#22c55e">0.300</span><span style="font-size:10px;color:#555"> (2+1)/10</span></td>
+        <td style="font-weight:700;color:#22c55e">0.67배 ↓정상</td>
+      </tr>
+<tr>
+        <td style="font-weight:700;color:#fff">클릭</td>
+        <td style="text-align:center">2</td>
+        <td><div class="bar"><div class="bf" style="width:30%;background:#ef4444"></div></div><span class="prob-val" style="color:#ef4444">0.300</span><span style="font-size:10px;color:#555"> (2+1)/10</span></td>
+        <td style="text-align:center">0</td>
+        <td><div class="bar"><div class="bf" style="width:10%;background:#22c55e"></div></div><span class="prob-val" style="color:#22c55e">0.100</span><span style="font-size:10px;color:#555"> (0+1)/10</span></td>
+        <td style="font-weight:700;color:#ef4444">3.0배 ↑스팸</td>
+      </tr>
+<tr>
+        <td style="font-weight:700;color:#fff">안내</td>
+        <td style="text-align:center">0</td>
+        <td><div class="bar"><div class="bf" style="width:10%;background:#ef4444"></div></div><span class="prob-val" style="color:#ef4444">0.100</span><span style="font-size:10px;color:#555"> (0+1)/10</span></td>
+        <td style="text-align:center">4</td>
+        <td><div class="bar"><div class="bf" style="width:50%;background:#22c55e"></div></div><span class="prob-val" style="color:#22c55e">0.500</span><span style="font-size:10px;color:#555"> (4+1)/10</span></td>
+        <td style="font-weight:700;color:#22c55e">0.2배 ↓정상</td>
+      </tr>
+      </tbody>
+    </table></div>
+  </div>
+  <div class="warn">
+    <strong>라플라스 스무딩 필요!</strong> 이벤트·클릭·무료는 정상에서 0번 등장 → P=0이 되면 나이브 베이즈 전체 점수가 0이 됩니다.<br>
+    스무딩 적용: (0+1)/(5+5) = 0.100 으로 보정합니다.
+  </div>
+
+  <div class="card">
+    <div style="font-weight:700;color:#fff;margin-bottom:10px">사전 확률 설정</div>
+    <div class="sub" style="margin-bottom:10px">P(스팸)을 선택하세요. (기본값: 0.5)</div>
+    <div class="prior-row">
+      <button class="prior-chip sel" id="pr30" onclick="setPrior(0.3)">P(스팸) = 0.3</button>
+      <button class="prior-chip sel" id="pr50" onclick="setPrior(0.5)">P(스팸) = 0.5 ★기본</button>
+      <button class="prior-chip" id="pr70" onclick="setPrior(0.7)">P(스팸) = 0.7</button>
+    </div>
+    <div id="priorNote" style="font-size:13px;color:#94a3b8;margin-top:8px">현재: P(스팸) = 0.5, P(정상) = 0.5</div>
+  </div>
+
+  <div class="brow">
+    <button class="btn bg" onclick="go(1)">← 이전</button>
+    <button class="btn br" onclick="go(3)">테스트 이메일 분류하기 →</button>
+  </div>
+</div>
+
+<!-- 3: 테스트 -->
+<div class="step" id="s3">
+  <h2>테스트 이메일 분류</h2>
+  <div class="sub">학습 때 보지 않은 이메일 6개를 단일 증거(무료 단어 1개)와 복합 증거(나이브 베이즈)로 각각 분류합니다.</div>
+
+  <div class="card">
+    <div style="font-weight:700;color:#fff;margin-bottom:6px">현재 사전 확률: <span id="priorDisplay" style="color:#60a5fa">P(스팸)=0.5</span></div>
+    <div style="overflow-x:auto"><table>
+      <thead><tr>
+        <th>번호</th><th>이메일 제목</th><th>실제 정답</th><th>포함 단어</th>
+        <th style="color:#f97316">단일 증거<br>(무료 유무)</th>
+        <th style="color:#f97316">단일 판정</th>
+        <th style="color:#3b82f6">복합 증거<br>P(스팸|이메일)</th>
+        <th style="color:#3b82f6">복합 판정</th>
+      </tr></thead>
+      <tbody id="testTableBody"></tbody>
+    </table></div>
+    <div style="margin-top:10px;font-size:12px;color:#475569">* 단일 증거: 무료 포함 시 P(스팸|무료), 미포함 시 P(스팸|¬무료)</div>
+  </div>
+
+  <div class="card">
+    <div style="font-weight:700;color:#fff;margin-bottom:12px">정확도 비교</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div style="text-align:center;padding:14px;border-radius:9px;background:rgba(249,115,22,.1);border:1px solid rgba(249,115,22,.3)">
+        <div style="font-size:11px;color:#f97316;margin-bottom:4px">단일 증거</div>
+        <div id="acc1" style="font-size:28px;font-weight:900;color:#f97316">—</div>
+        <div style="font-size:11px;color:#666">정확도</div>
+      </div>
+      <div style="text-align:center;padding:14px;border-radius:9px;background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.3)">
+        <div style="font-size:11px;color:#3b82f6;margin-bottom:4px">복합 증거</div>
+        <div id="acc2" style="font-size:28px;font-weight:900;color:#3b82f6">—</div>
+        <div style="font-size:11px;color:#666">정확도</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="brow">
+    <button class="btn bg" onclick="go(2)">← 이전</button>
+    <button class="btn br" onclick="go(4)">비교 분석 →</button>
+  </div>
+</div>
+
+<!-- 4: 비교 분석 -->
+<div class="step" id="s4">
+  <h2>비교 분석 &amp; 토론</h2>
+  <div class="sub">단일 증거와 복합 증거의 결과 차이를 분석하고, 나이브 베이즈의 원리를 정리합니다.</div>
+
+  <div class="card">
+    <div style="font-weight:700;color:#fff;margin-bottom:14px">★ 결과가 달라진 이메일 분석</div>
+    <div id="contrastOut">테스트를 먼저 실행하세요.</div>
+  </div>
+
+  <div class="card">
+    <div style="font-weight:700;color:#fff;margin-bottom:12px">핵심 개념 정리</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:13px">
+      <div style="padding:12px;background:#1e1e2e;border-radius:8px;border-left:3px solid #f97316">
+        <div style="font-weight:700;color:#f97316;margin-bottom:6px">단일 증거 (베이즈 정리)</div>
+        <div style="color:#94a3b8;line-height:1.7">단어 1개(무료)만 증거로 사용.<br>무료가 없는 스팸을 잡지 못하고,<br>무료가 있는 정상 메일을 오분류함.</div>
+      </div>
+      <div style="padding:12px;background:#1e1e2e;border-radius:8px;border-left:3px solid #3b82f6">
+        <div style="font-weight:700;color:#3b82f6;margin-bottom:6px">복합 증거 (나이브 베이즈)</div>
+        <div style="color:#94a3b8;line-height:1.7">여러 단어의 우도를 모두 곱함.<br>각 단어가 독립이라는 '나이브 가정'으로<br>계산을 단순화하지만 실제로도 잘 작동함.</div>
+      </div>
+    </div>
+    <div style="margin-top:10px;padding:10px 12px;background:#1e1e2e;border-radius:8px;font-size:13px;color:#94a3b8;line-height:1.7">
+      <strong style="color:#fff">나이브 베이즈 공식</strong><br>
+      P(스팸|이메일) ∝ P(스팸) × P(단어₁|스팸) × P(단어₂|스팸) × …<br>
+      P(스팸|이메일) = 스팸점수 ÷ (스팸점수 + 정상점수)
+    </div>
+  </div>
+
+  <div class="card">
+    <div style="font-weight:700;color:#fff;margin-bottom:12px">💬 팀 토론 질문</div>
+    <div class="dq"><div class="qn" style="color:#60a5fa">Q1</div>단일 증거가 틀린 이메일은 어느 것이었나요? 왜 틀렸을까요?</div>
+    <div class="dq"><div class="qn" style="color:#f97316">Q2</div>'신청' 단어는 스팸보다 정상에서 더 많이 등장합니다(0.67배). 그런데 이벤트+신청이 동시에 있으면 스팸 점수가 올라갈까요, 내려갈까요?</div>
+    <div class="dq"><div class="qn" style="color:#a855f7">Q3</div>사전 확률 P(스팸)을 0.3으로 바꾸면 결과가 어떻게 달라지나요? Step 2에서 바꿔보고 결과를 비교해 보세요.</div>
+    <div class="dq"><div class="qn" style="color:#22c55e">Q4</div>학습 데이터가 10개밖에 없습니다. 라플라스 스무딩이 없다면 어떤 문제가 생길까요?</div>
+  </div>
+
+  <div class="brow">
+    <button class="btn bg" onclick="go(3)">← 이전</button>
+    <button class="btn br" onclick="resetAll()">처음으로 ↺</button>
+  </div>
+</div>
+
+</div>
+<script>
+var WORDS = ['무료','이벤트','신청','클릭','안내'];
+var WD = {
+  '무료':  {cs:2, cn:0},
+  '이벤트':{cs:2, cn:0},
+  '신청':  {cs:1, cn:2},
+  '클릭':  {cs:2, cn:0},
+  '안내':  {cs:0, cn:4}
+};
+var TEST = [  {id:'T1',text:'무료 쿠폰 발급 — 오늘만 가능합니다',label:'스팸',words:['무료']},
+  {id:'T2',text:'무료 체험판 신청하고 선물 받아가세요',label:'스팸',words:['무료','신청']},
+  {id:'T3',text:'당신만을 위한 특별 할인 이벤트',label:'스팸',words:['이벤트']},
+  {id:'T4',text:'동아리 신청 및 안내',label:'정상',words:['신청','안내']},
+  {id:'T5',text:'이벤트 클릭하고 상품 신청하세요!',label:'스팸',words:['이벤트','클릭','신청']},
+  {id:'T6',text:'졸업앨범 촬영 일정 안내',label:'정상',words:['안내']},
+];
+var STEPS = ['소개','학습 데이터','확률 계산','테스트','비교 분석'];
+var curStep = 0;
+var unlocked = {0:true,1:true,2:true,3:true,4:true};
+var prior = 0.5;
+
+function buildNav(){
+  var h='';
+  for(var i=0;i<STEPS.length;i++){
+    var cls = i===curStep?'nbtn on':unlocked[i]?'nbtn done':'nbtn locked';
+    h += '<button class="'+cls+'" onclick="go('+i+')">'+STEPS[i]+'</button>';
+  }
+  document.getElementById('nav').innerHTML=h;
+}
+function go(n){
+  if(n>0&&!unlocked[n])return;
+  curStep=n;
+  for(var i=0;i<5;i++){var e=document.getElementById('s'+i);if(e)e.className='step'+(i===n?' on':'');}
+  buildNav();
+  if(n===3) renderTest();
+  if(n===4) renderContrast();
+  window.scrollTo(0,0);
+}
+function unk(n){unlocked[n]=true;}
+buildNav();
+
+// 확률 계산
+function ps(w){return (WD[w]?WD[w].cs+1:1)/10;}
+function pn(w){return (WD[w]?WD[w].cn+1:1)/10;}
+
+function classify(words){
+  var s=prior, n=1-prior;
+  words.forEach(function(w){if(WD[w]){s*=ps(w);n*=pn(w);}});
+  var tot=s+n;
+  return tot>0?Math.round(s/tot*1000)/10:50;
+}
+
+// 단일 증거: 무료 유무만 사용
+function classifySingle(words){
+  var hasMuRyo = words.indexOf('무료')>=0;
+  // P(스팸|무료) = ps('무료')*prior / (ps('무료')*prior + pn('무료')*(1-prior))
+  if(hasMuRyo){
+    var s=prior*ps('무료'), n=(1-prior)*pn('무료'), tot=s+n;
+    return tot>0?Math.round(s/tot*1000)/10:50;
+  } else {
+    var ps2=1-ps('무료'), pn2=1-pn('무료');
+    var s=prior*ps2, n=(1-prior)*pn2, tot=s+n;
+    return tot>0?Math.round(s/tot*1000)/10:50;
+  }
+}
+
+function setPrior(p){
+  prior=p;
+  document.getElementById('priorNote').innerText='현재: P(스팸) = '+p+', P(정상) = '+(1-p).toFixed(1);
+  ['pr30','pr50','pr70'].forEach(function(id,i){
+    document.getElementById(id).className='prior-chip'+([0.3,0.5,0.7][i]===p?' sel':'');
+  });
+  if(curStep===3) renderTest();
+  if(curStep===4) renderContrast();
+  document.getElementById('priorDisplay').innerText='P(스팸)='+p;
+}
+
+// 초기 prior 버튼 상태 수정
+document.getElementById('pr30').className='prior-chip';
+document.getElementById('pr50').className='prior-chip sel';
+
+function renderTest(){
+  unk(3); unk(4);
+  var tbody='', ok1=0, ok2=0;
+  TEST.forEach(function(e){
+    var p1=classifySingle(e.words);
+    var p2=classify(e.words);
+    var j1=p1>=50?'스팸':'정상';
+    var j2=p2>=50?'스팸':'정상';
+    var isSpam=e.label==='스팸';
+    var c1=j1===e.label; if(c1)ok1++;
+    var c2=j2===e.label; if(c2)ok2++;
+    var badge=isSpam?'<span class="badge badge-spam">스팸</span>':'<span class="badge badge-ham">정상</span>';
+    var wtags=e.words.map(function(w){return '<span class="word-tag">'+w+'</span>';}).join('');
+    var hasMr=e.words.indexOf('무료')>=0;
+    var p1str=(hasMr?'무료 있음':'무료 없음')+'<br><span style="font-family:monospace;font-weight:700;color:#f97316">'+p1.toFixed(1)+'%</span>';
+    var tick1=c1?'<span style="color:#22c55e">✓</span>':'<span style="color:#ef4444">✗</span>';
+    var tick2=c2?'<span style="color:#22c55e">✓</span>':'<span style="color:#ef4444">✗</span>';
+    var diff=c1!==c2?' style="background:rgba(234,179,8,.06)"':'';
+    var j1color=j1==='스팸'?'#ef4444':'#22c55e';
+    var j2color=j2==='스팸'?'#ef4444':'#22c55e';
+    tbody+='<tr'+diff+'>';
+    tbody+='<td style="font-size:11px;color:#666">'+e.id+'</td>';
+    tbody+='<td>'+e.text+'</td>';
+    tbody+='<td>'+badge+'</td>';
+    tbody+='<td>'+(wtags||'<span style="color:#444;font-size:11px">—</span>')+'</td>';
+    tbody+='<td style="font-size:12px;color:#94a3b8;text-align:center">'+p1str+'</td>';
+    tbody+='<td style="text-align:center"><span style="font-weight:700;color:'+j1color+'">'+j1+'</span> '+tick1+'</td>';
+    tbody+='<td style="text-align:center;font-family:monospace;font-weight:700;color:#3b82f6">'+p2.toFixed(1)+'%</td>';
+    tbody+='<td style="text-align:center"><span style="font-weight:700;color:'+j2color+'">'+j2+'</span> '+tick2+'</td>';
+    tbody+='</tr>';
+  });
+  document.getElementById('testTableBody').innerHTML=tbody;
+  document.getElementById('acc1').innerText=ok1+'/'+TEST.length;
+  document.getElementById('acc2').innerText=ok2+'/'+TEST.length;
+}
+
+function renderContrast(){
+  var h='';
+  var found=false;
+  TEST.forEach(function(e){
+    var p1=classifySingle(e.words);
+    var p2=classify(e.words);
+    var j1=p1>=50?'스팸':'정상';
+    var j2=p2>=50?'스팸':'정상';
+    if(j1!==j2){
+      found=true;
+      var isSpam=e.label==='스팸';
+      var hasMr=e.words.indexOf('무료')>=0;
+      var j1ok=j1===e.label, j2ok=j2===e.label;
+      h+='<div style="padding:12px;background:#1e1e2e;border-radius:8px;margin-bottom:10px;border-left:3px solid #eab308">';
+      h+='<div style="font-weight:700;color:#fff;margin-bottom:6px">'+e.id+' &ldquo;'+e.text+'&rdquo;</div>';
+      h+='<div style="font-size:13px;color:#94a3b8;margin-bottom:8px">실제 정답: <strong style="color:'+(isSpam?'#ef4444':'#22c55e')+'">'+e.label+'</strong> &nbsp;|&nbsp; 포함 단어: '+e.words.join(', ')+'</div>';
+      h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
+      h+='<div style="padding:9px;border-radius:7px;background:'+(j1ok?'rgba(34,197,94,.1)':'rgba(239,68,68,.1)')+';border:1px solid '+(j1ok?'#22c55e':'#ef4444')+'">';
+      h+='<div style="font-size:10px;color:#f97316;margin-bottom:3px">단일 증거 ('+(hasMr?'무료 있음':'무료 없음')+')</div>';
+      h+='<div style="font-weight:700;font-size:15px;color:#f97316">'+p1.toFixed(1)+'% → '+j1+' '+(j1ok?'✓':'✗')+'</div>';
+      h+='<div style="font-size:11px;color:#666;margin-top:3px">'+(j1ok?'정답':'오답: 무료 유무만으로 판단')+'</div></div>';
+      h+='<div style="padding:9px;border-radius:7px;background:'+(j2ok?'rgba(34,197,94,.1)':'rgba(239,68,68,.1)')+';border:1px solid '+(j2ok?'#22c55e':'#ef4444')+'">';
+      h+='<div style="font-size:10px;color:#3b82f6;margin-bottom:3px">복합 증거 ('+e.words.join('+')+')</div>';
+      h+='<div style="font-weight:700;font-size:15px;color:#3b82f6">'+p2.toFixed(1)+'% → '+j2+' '+(j2ok?'✓':'✗')+'</div>';
+      h+='<div style="font-size:11px;color:#666;margin-top:3px">'+(j2ok?'정답: 여러 단어 신호 종합':'오답')+'</div></div>';
+      h+='</div></div>';
+    }
+  });
+  if(!found) h='<div style="color:#94a3b8">두 방법의 결과가 모두 일치합니다.</div>';
+  document.getElementById('contrastOut').innerHTML=h;
+}
+
+function resetAll(){
+  prior=0.5;
+  document.getElementById('pr30').className='prior-chip';
+  document.getElementById('pr50').className='prior-chip sel';
+  document.getElementById('pr70').className='prior-chip';
+  document.getElementById('priorNote').innerText='현재: P(스팸) = 0.5, P(정상) = 0.5';
+  unlocked={0:true,1:true,2:true}; curStep=0;
+  document.getElementById('testTableBody').innerHTML='';
+  document.getElementById('acc1').innerText='—';
+  document.getElementById('acc2').innerText='—';
+  document.getElementById('contrastOut').innerHTML='테스트를 먼저 실행하세요.';
+  go(0);
+}
+</script>
+</body>
+</html>
